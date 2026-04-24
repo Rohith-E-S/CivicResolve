@@ -195,11 +195,9 @@ fun LoginScreen(
             .fillMaxSize()
             .background(BgColor)
             .padding(horizontal = 24.dp, vertical = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Spacer(modifier = Modifier.height(58.dp))
-        
-
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 40.dp)) {
             Text(
                 text = "Welcome back",

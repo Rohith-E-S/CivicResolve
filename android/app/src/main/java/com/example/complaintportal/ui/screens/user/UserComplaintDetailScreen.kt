@@ -1,6 +1,7 @@
 package com.example.complaintportal.ui.screens.user
 
 import android.content.Intent
+import android.net.Uri
 import com.example.complaintportal.ui.screens.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -60,6 +61,13 @@ fun UserComplaintDetailScreen(
                 title = { Text("CivicResolve", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primaryContainer) },
                 actions = {
                     if (complaint != null) {
+                        IconButton(onClick = {
+                            val mapUri = Uri.parse("geo:${complaint.latitude},${complaint.longitude}?q=${complaint.latitude},${complaint.longitude}(${Uri.encode(complaint.category)})")
+                            val mapIntent = Intent(Intent.ACTION_VIEW, mapUri)
+                            context.startActivity(mapIntent)
+                        }) {
+                            Icon(Icons.Default.Map, contentDescription = "Open in Maps", tint = MaterialTheme.colorScheme.primary)
+                        }
                         IconButton(onClick = {
                             val sendIntent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"

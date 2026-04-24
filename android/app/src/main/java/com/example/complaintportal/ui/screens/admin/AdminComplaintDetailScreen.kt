@@ -102,6 +102,13 @@ fun AdminComplaintDetailScreen(
                 actions = {
                     if (complaint != null) {
                         IconButton(onClick = {
+                            val mapUri = Uri.parse("geo:${complaint.latitude},${complaint.longitude}?q=${complaint.latitude},${complaint.longitude}(${Uri.encode(complaint.category)})")
+                            val mapIntent = Intent(Intent.ACTION_VIEW, mapUri)
+                            context.startActivity(mapIntent)
+                        }) {
+                            Icon(Icons.Default.Map, contentDescription = "Open in Maps", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = {
                             val sendIntent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
                                 putExtra(Intent.EXTRA_TITLE, "Complaint Details")
@@ -113,6 +120,8 @@ fun AdminComplaintDetailScreen(
                                     
                                     Description:
                                     ${complaint.description}
+                                    
+                                    Map Location: https://www.google.com/maps/search/?api=1&query=${complaint.latitude},${complaint.longitude}
                                 """.trimIndent())
                             }
                             context.startActivity(Intent.createChooser(sendIntent, "Share Complaint"))
