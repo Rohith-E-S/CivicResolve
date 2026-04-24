@@ -72,6 +72,8 @@ fun UserComplaintDetailScreen(
                                     
                                     Description:
                                     ${complaint.description}
+                                    
+                                    Map Location: https://www.google.com/maps/search/?api=1&query=${complaint.latitude},${complaint.longitude}
                                 """.trimIndent())
                             }
                             context.startActivity(Intent.createChooser(sendIntent, "Share Complaint"))

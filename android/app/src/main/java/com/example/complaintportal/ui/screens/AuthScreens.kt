@@ -197,25 +197,9 @@ fun LoginScreen(
             .padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(38.dp))
+        Spacer(modifier = Modifier.height(58.dp))
         
-        // Help Icon
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(Slate200),
-                contentAlignment = Alignment.Center
-            ) {
-//                Icon(Icons.Default.HelpOutline, contentDescription = "Help", tint = Slate500)
-            }
-        }
-        
+
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 40.dp)) {
             Text(
                 text = "Welcome back",
