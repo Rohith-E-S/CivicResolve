@@ -2,9 +2,9 @@ package com.example.complaintportal.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -28,6 +28,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.painterResource
 import com.example.complaintportal.R
 import coil.compose.rememberAsyncImagePainter
+import android.Manifest
+import android.content.pm.PackageManager
+import android.location.Geocoder
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationServices
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.util.Locale
 import com.example.complaintportal.data.model.CreateAccountRequest
 import com.example.complaintportal.data.model.GoogleLoginRequest
 import com.example.complaintportal.data.model.LoginRequest
@@ -38,6 +46,90 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.CommonStatusCodes
+
+private fun fetchLocation(
+    context: android.content.Context,
+    fusedLocationClient: com.google.android.gms.location.FusedLocationProviderClient,
+    scope: kotlinx.coroutines.CoroutineScope,
+    onResult: (String) -> Unit
+) {
+    try {
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        val geocoder = Geocoder(context, Locale.getDefault())
+                        @Suppress("DEPRECATION")
+                        val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                        if (!addresses.isNullOrEmpty()) {
+                            val addr = addresses[0]
+                            val fullAddress = listOfNotNull(
+                                addr.featureName,
+                                addr.thoroughfare,
+                                addr.subLocality,
+                                addr.locality,
+                                addr.adminArea
+                            ).filter { it.isNotBlank() }.distinct().joinToString(", ")
+                            launch(Dispatchers.Main) { onResult(fullAddress.ifBlank { "Coordinates: ${location.latitude}, ${location.longitude}" }) }
+                        } else {
+                            launch(Dispatchers.Main) { onResult("Coordinates: ${location.latitude}, ${location.longitude}") }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        launch(Dispatchers.Main) { onResult("Coordinates: ${location.latitude}, ${location.longitude}") }
+                    }
+                }
+            } else {
+                onResult("Unable to fetch location. Turn on GPS.")
+            }
+        }
+    } catch (e: SecurityException) {
+        onResult("Location permission denied")
+    }
+}
+
+
+private val Slate900 = Color(0xFF0F172A)
+private val Slate700 = Color(0xFF334155)
+private val Slate500 = Color(0xFF64748B)
+private val Slate300 = Color(0xFFCBD5E1)
+private val Slate200 = Color(0xFFE2E8F0)
+private val BgColor = Color(0xFFF7F7F7)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AuthTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth().height(64.dp),
+        placeholder = { Text(placeholder, color = Slate500, fontWeight = FontWeight.Medium, fontSize = 18.sp) },
+        leadingIcon = leadingIcon,
+        trailingIcon = trailingIcon,
+        visualTransformation = visualTransformation,
+        shape = RoundedCornerShape(24.dp),
+        keyboardOptions = keyboardOptions,
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.White,
+            focusedBorderColor = Slate900,
+            unfocusedBorderColor = Slate200,
+            focusedTextColor = Slate900,
+            unfocusedTextColor = Slate900,
+            cursorColor = Slate900
+        ),
+        textStyle = LocalTextStyle.current.copy(fontSize = 18.sp, fontWeight = FontWeight.Medium)
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,15 +193,15 @@ fun LoginScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
+            .background(BgColor)
+            .padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(64.dp))
+        Spacer(modifier = Modifier.height(38.dp))
         
-        // Help Button
+        // Help Icon
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -117,171 +209,150 @@ fun LoginScreen(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(Slate200),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.HelpOutline, contentDescription = "Help", tint = MaterialTheme.colorScheme.outline)
+//                Icon(Icons.Default.HelpOutline, contentDescription = "Help", tint = Slate500)
             }
         }
         
-        Spacer(modifier = Modifier.height(48.dp))
-
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 40.dp)) {
             Text(
                 text = "Welcome back",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onSurface
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontSize = 36.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Slate900,
+                    letterSpacing = (-0.5).sp
+                )
             )
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Sign in to continue your civic journey.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp)
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Slate700,
+                    letterSpacing = 0.5.sp
+                )
             )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
-
         // Email Field
-        Column(modifier = Modifier.fillMaxWidth()) {
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Email") },
-                leadingIcon = { Icon(Icons.Default.MailOutline, contentDescription = null) },
-                shape = CircleShape,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        AuthTextField(
+            value = email,
+            onValueChange = { email = it },
+            placeholder = "Email",
+            leadingIcon = { Icon(Icons.Default.MailOutline, contentDescription = null, tint = Slate500) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Password Field
+        AuthTextField(
+            value = password,
+            onValueChange = { password = it },
+            placeholder = "Password",
+            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Slate500) },
+            trailingIcon = {
+                val icon = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(icon, contentDescription = "Toggle password visibility", tint = Slate500)
+                }
+            },
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation()
+        )
+
+        // Forgot Password
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(
+                onClick = onNavigateToForgotPassword,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.textButtonColors(
+                    containerColor = Slate200,
+                    contentColor = Slate900
+                ),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Forgot Password?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
                 )
-            )
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Password Field
-        Column(modifier = Modifier.fillMaxWidth()) {
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Password") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                trailingIcon = {
-                    val icon = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(icon, contentDescription = "Toggle password visibility")
-                    }
-                },
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                shape = CircleShape,
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                )
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
+        Button(
+            onClick = { viewModel.login(LoginRequest(email, password), onLoginSuccess) },
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Slate900,
+                contentColor = Color.White
+            ),
+            enabled = !state.isLoading
         ) {
-            TextButton(onClick = onNavigateToForgotPassword) {
-                Text(
-                    text = "Forgot Password?",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+            Text(if (state.isLoading) "Loading..." else "Sign In", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = { viewModel.login(LoginRequest(email, password), onLoginSuccess) },
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = CircleShape,
-            enabled = !state.isLoading
-        ) {
-            Text(if (state.isLoading) "Loading..." else "Sign In", fontWeight = FontWeight.Bold)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        TextButton(
             onClick = onNavigateToSignup,
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = CircleShape,
-            colors = ButtonDefaults.textButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.primary
+            shape = RoundedCornerShape(24.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Slate200,
+                contentColor = Slate900
             )
         ) {
-            Text("Create Account", fontWeight = FontWeight.Bold)
+            Text("Create Account", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(48.dp))
 
         // Digital ID Divider
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
-            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
+            HorizontalDivider(modifier = Modifier.weight(1f), color = Slate200)
             Text(
                 text = "DIGITAL ID",
                 modifier = Modifier.padding(horizontal = 16.dp),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline,
+                color = Slate500,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 2.sp
             )
-            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+            HorizontalDivider(modifier = Modifier.weight(1f), color = Slate200)
         }
 
         // Social Logins
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            // Google Login
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f), CircleShape)
-                    .clickable(enabled = !state.isLoading) {
-                        val useIdToken = webClientId.isNotBlank()
-                        launchedWithIdToken = useIdToken
-                        val client = if (useIdToken) googleSignInClientWithIdToken else googleSignInClientBasic
-                        googleSignInLauncher.launch(client.signInIntent)
-                    },
-                contentAlignment = Alignment.Center
+        Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                onClick = {
+                    val useIdToken = webClientId.isNotBlank()
+                    launchedWithIdToken = useIdToken
+                    val client = if (useIdToken) googleSignInClientWithIdToken else googleSignInClientBasic
+                    googleSignInLauncher.launch(client.signInIntent)
+                },
+                shape = CircleShape,
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFF1F5F9)), // slate-100
+                shadowElevation = 2.dp,
+                modifier = Modifier.size(56.dp)
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_google_logo),
-                    contentDescription = "Google",
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            
-            // Apple Placeholder
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f), CircleShape)
-                    .clickable { /* TODO */ },
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = rememberAsyncImagePainter("https://lh3.googleusercontent.com/aida-public/AB6AXuB4eAOap7Ow9ur_zDnustA9xwT26iYwT7b6vEDZ7Ss33Di39L8SRfAQmLalL6kQWVnf8hWJtoJD41cPtR1F5nDCfue2TUYAfV6qGHa01kQiEkgbyMe6afm1qRpU0wQdSQxRwVUGDrqY50ashIVxgAnEmndY9rfQzuJRN9KzNx505z1WSf2Uvf8JfobiyfRRU97Bc0lQ4Sfw0QYU6VlmexbX6EKhOFtDFDA4wG4qaiRMwO0BAyyzw7vDKimF1G8YX9WIejzdWeyJq_Dv"),
-                    contentDescription = "Apple",
-                    modifier = Modifier.size(24.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_google_logo),
+                        contentDescription = "Google",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
 
@@ -321,6 +392,24 @@ fun SignupScreen(
     var launchedWithIdToken by remember { mutableStateOf(false) }
     var retryWithoutIdToken by remember { mutableStateOf(false) }
 
+    val scope = rememberCoroutineScope()
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var isFetchingLocation by remember { mutableStateOf(false) }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true || permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true) {
+            isFetchingLocation = true
+            fetchLocation(context, fusedLocationClient, scope) { fetchedAddress ->
+                address = fetchedAddress
+                isFetchingLocation = false
+            }
+        } else {
+            viewModel.setError("Location permission denied")
+        }
+    }
+
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -356,91 +445,93 @@ fun SignupScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
+            .background(BgColor)
+            .padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(32.dp))
         
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 40.dp)) {
             Text(
                 text = "Complete Profile",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontSize = 36.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Slate900,
+                    letterSpacing = (-0.5).sp
+                )
             )
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Last step to join your community.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp)
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Slate700,
+                    letterSpacing = 0.5.sp
+                )
             )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        OutlinedTextField(
+        AuthTextField(
             value = fullName,
             onValueChange = { fullName = it },
-            label = { Text("Full Name") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = CircleShape,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface
-            )
+            placeholder = "Full Name",
+            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = Slate500) }
         )
+        Spacer(modifier = Modifier.height(20.dp))
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        OutlinedTextField(
+        AuthTextField(
             value = email,
             onValueChange = { email = it },
-            placeholder = { Text("Email") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = CircleShape,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface
-            )
+            placeholder = "Email",
+            leadingIcon = { Icon(Icons.Default.MailOutline, contentDescription = null, tint = Slate500) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
         )
+        Spacer(modifier = Modifier.height(20.dp))
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        OutlinedTextField(
+        AuthTextField(
             value = address,
             onValueChange = { address = it },
-            label = { Text("Residential Address") },
-            modifier = Modifier.fillMaxWidth(),
-            trailingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-            shape = CircleShape,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface
-            )
+            placeholder = "Residential Address",
+            leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = Slate500) },
+            trailingIcon = {
+                if (isFetchingLocation) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Slate900)
+                } else {
+                    IconButton(onClick = {
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                            isFetchingLocation = true
+                            fetchLocation(context, fusedLocationClient, scope) { fetchedAddress ->
+                                address = fetchedAddress
+                                isFetchingLocation = false
+                            }
+                        } else {
+                            locationPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                        }
+                    }) {
+                        Icon(Icons.Default.GpsFixed, contentDescription = "Get Location", tint = Slate500)
+                    }
+                }
+            }
         )
+        Spacer(modifier = Modifier.height(20.dp))
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
+        AuthTextField(
             value = password,
             onValueChange = { password = it },
-            placeholder = { Text("Password") },
-            modifier = Modifier.fillMaxWidth(),
+            placeholder = "Password",
+            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Slate500) },
             trailingIcon = {
                 val icon = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                    Icon(icon, contentDescription = "Toggle password visibility")
+                    Icon(icon, contentDescription = "Toggle password visibility", tint = Slate500)
                 }
             },
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            shape = CircleShape,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface
-            )
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation()
         )
-
+        
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
@@ -455,57 +546,64 @@ fun SignupScreen(
                 }
             },
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = CircleShape,
+            shape = RoundedCornerShape(24.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Slate900,
+                contentColor = Color.White
+            ),
             enabled = !state.isLoading
         ) {
-            Text(if (state.isLoading) "Sending OTP..." else "Continue with email", fontWeight = FontWeight.Bold)
+            Text(if (state.isLoading) "Sending OTP..." else "Continue with email", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+        // OR Divider
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            HorizontalDivider(modifier = Modifier.weight(1f), color = Slate200)
             Text(
                 text = "OR",
                 modifier = Modifier.padding(horizontal = 16.dp),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline,
+                color = Slate500,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
             )
-            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+            HorizontalDivider(modifier = Modifier.weight(1f), color = Slate200)
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f), CircleShape)
-                .clickable(enabled = !state.isLoading) {
+        // Social Login
+        Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                onClick = {
                     val useIdToken = webClientId.isNotBlank()
                     launchedWithIdToken = useIdToken
                     val client = if (useIdToken) googleSignInClientWithIdToken else googleSignInClientBasic
                     googleSignInLauncher.launch(client.signInIntent)
                 },
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.ic_google_logo),
-                contentDescription = "Google",
-                modifier = Modifier.size(24.dp)
-            )
+                shape = CircleShape,
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                shadowElevation = 2.dp,
+                modifier = Modifier.size(56.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_google_logo),
+                        contentDescription = "Google",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         TextButton(
             onClick = onNavigateToLogin,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Already have an account? Login", color = MaterialTheme.colorScheme.primary)
+            Text("Already have an account? Login", color = Slate900, fontWeight = FontWeight.Bold)
         }
 
         if (state.error != null) {
@@ -582,52 +680,49 @@ fun ForgotPasswordScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
+            .background(BgColor)
+            .padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(32.dp))
         
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onNavigateBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+            IconButton(onClick = onNavigateBack, modifier = Modifier.background(Slate200, CircleShape)) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Slate900)
             }
             Text(
                 text = "Forgot Password",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = 8.dp)
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Slate900,
+                    letterSpacing = (-0.5).sp
+                ),
+                modifier = Modifier.padding(start = 16.dp)
             )
         }
-
-        Spacer(modifier = Modifier.height(32.dp))
 
         when (currentStep) {
             ForgotPasswordStep.ENTER_EMAIL -> {
                 Text(
                     text = "Enter your email address to receive a password reset OTP.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Slate700,
+                        letterSpacing = 0.5.sp
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
                 )
-                Spacer(modifier = Modifier.height(24.dp))
-                OutlinedTextField(
+                AuthTextField(
                     value = email,
                     onValueChange = { email = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Email") },
-                    leadingIcon = { Icon(Icons.Default.MailOutline, contentDescription = null) },
-                    shape = CircleShape,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    )
+                    placeholder = "Email",
+                    leadingIcon = { Icon(Icons.Default.MailOutline, contentDescription = null, tint = Slate500) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                 )
                 Spacer(modifier = Modifier.height(32.dp))
                 Button(
@@ -641,32 +736,32 @@ fun ForgotPasswordScreen(
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = CircleShape,
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Slate900,
+                        contentColor = Color.White
+                    ),
                     enabled = !state.isLoading
                 ) {
-                    Text(if (state.isLoading) "Sending OTP..." else "Send OTP", fontWeight = FontWeight.Bold)
+                    Text(if (state.isLoading) "Sending OTP..." else "Send OTP", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 }
             }
             ForgotPasswordStep.ENTER_OTP -> {
                 Text(
                     text = "Enter the OTP sent to $email",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Slate700,
+                        letterSpacing = 0.5.sp
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
                 )
-                Spacer(modifier = Modifier.height(24.dp))
-                OutlinedTextField(
+                AuthTextField(
                     value = otp,
                     onValueChange = { otp = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Enter OTP") },
-                    shape = CircleShape,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    )
+                    placeholder = "Enter OTP",
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 Spacer(modifier = Modifier.height(32.dp))
                 Button(
@@ -681,54 +776,47 @@ fun ForgotPasswordScreen(
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = CircleShape,
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Slate900,
+                        contentColor = Color.White
+                    ),
                     enabled = !state.isLoading
                 ) {
-                    Text(if (state.isLoading) "Verifying..." else "Verify OTP", fontWeight = FontWeight.Bold)
+                    Text(if (state.isLoading) "Verifying..." else "Verify OTP", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 }
             }
             ForgotPasswordStep.ENTER_NEW_PASSWORD -> {
                 Text(
                     text = "Create a new password.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Slate700,
+                        letterSpacing = 0.5.sp
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
                 )
-                Spacer(modifier = Modifier.height(24.dp))
-                OutlinedTextField(
+                AuthTextField(
                     value = newPassword,
                     onValueChange = { newPassword = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("New Password") },
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    placeholder = "New Password",
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Slate500) },
                     trailingIcon = {
                         val icon = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(icon, contentDescription = "Toggle password visibility")
+                            Icon(icon, contentDescription = "Toggle password visibility", tint = Slate500)
                         }
                     },
-                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    shape = CircleShape,
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    )
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation()
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
+                Spacer(modifier = Modifier.height(20.dp))
+                AuthTextField(
                     value = confirmPassword,
                     onValueChange = { confirmPassword = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Confirm New Password") },
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    shape = CircleShape,
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    )
+                    placeholder = "Confirm New Password",
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Slate500) },
+                    visualTransformation = PasswordVisualTransformation()
                 )
                 Spacer(modifier = Modifier.height(32.dp))
                 Button(
@@ -744,10 +832,14 @@ fun ForgotPasswordScreen(
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = CircleShape,
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Slate900,
+                        contentColor = Color.White
+                    ),
                     enabled = !state.isLoading
                 ) {
-                    Text(if (state.isLoading) "Resetting..." else "Reset Password", fontWeight = FontWeight.Bold)
+                    Text(if (state.isLoading) "Resetting..." else "Reset Password", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 }
             }
         }
@@ -773,51 +865,47 @@ fun OtpVerifyScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
+            .background(BgColor)
+            .padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(32.dp))
         
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onNavigateBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+            IconButton(onClick = onNavigateBack, modifier = Modifier.background(Slate200, CircleShape)) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Slate900)
             }
             Text(
                 text = "Verify Email",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = 8.dp)
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Slate900,
+                    letterSpacing = (-0.5).sp
+                ),
+                modifier = Modifier.padding(start = 16.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
-
         Text(
             text = "Enter the 6-digit OTP sent to $email",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth()
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = Slate700,
+                letterSpacing = 0.5.sp
+            ),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
         )
         
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        OutlinedTextField(
+        AuthTextField(
             value = otp,
             onValueChange = { otp = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Enter OTP") },
-            shape = CircleShape,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface
-            )
+            placeholder = "Enter OTP",
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
         
         Spacer(modifier = Modifier.height(32.dp))
@@ -838,10 +926,14 @@ fun OtpVerifyScreen(
                 }
             },
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = CircleShape,
+            shape = RoundedCornerShape(24.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Slate900,
+                contentColor = Color.White
+            ),
             enabled = !state.isLoading
         ) {
-            Text(if (state.isLoading) "Verifying..." else "Verify Account", fontWeight = FontWeight.Bold)
+            Text(if (state.isLoading) "Verifying..." else "Verify Account", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         }
 
         if (state.error != null) {

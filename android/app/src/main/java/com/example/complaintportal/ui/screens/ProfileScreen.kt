@@ -11,17 +11,21 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
 import com.example.complaintportal.ui.viewmodel.AuthViewModel
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -79,14 +83,31 @@ fun ProfileScreen(
     }
 
     Scaffold(
+        containerColor = Color(0xFFF9F9F9),
         topBar = {
             TopAppBar(
-                title = { Text("CivicResolve", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primaryContainer) },
+                title = { 
+                    Text(
+                        "CivicResolve", 
+                        fontWeight = FontWeight.Bold, 
+                        color = Color(0xFF1A1A1A),
+                        fontSize = 18.sp
+                    ) 
+                },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier
+                            .padding(start = 4.dp)
+                            .clip(CircleShape)
+                            .background(Color.Transparent)
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFF1A1A1A))
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFFF9F9F9)
+                )
             )
         }
     ) { padding ->
@@ -94,71 +115,97 @@ fun ProfileScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 16.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Avatar
+            // Profile Info Section
             Box(
                 modifier = Modifier
-                    .size(128.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable(enabled = !state.isLoading) { galleryLauncher.launch("image/*") },
-                contentAlignment = Alignment.Center
+                    .padding(bottom = 12.dp)
+                    .size(136.dp)
             ) {
-                if (!user?.profilePic.isNullOrEmpty()) {
-                    Image(
-                        painter = rememberAsyncImagePainter(user?.profilePic),
-                        contentDescription = "Profile Picture",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.outline)
-                }
-                
-                if (state.isLoading) {
-                    Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha=0.3f)), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                Box(
+                    modifier = Modifier
+                        .size(128.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFE5E7EB))
+                        .border(4.dp, Color(0xFFF9F9F9), CircleShape)
+                        .align(Alignment.Center)
+                        .clickable(enabled = !state.isLoading) { galleryLauncher.launch("image/*") },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!user?.profilePic.isNullOrEmpty()) {
+                        Image(
+                            painter = rememberAsyncImagePainter(user?.profilePic),
+                            contentDescription = "Profile Picture",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Person, 
+                            contentDescription = null, 
+                            modifier = Modifier.size(60.dp), 
+                            tint = Color(0xFF9CA3AF)
+                        )
+                    }
+                    
+                    if (state.isLoading) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha=0.3f)), 
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                        }
                     }
                 }
 
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .size(40.dp)
+                        .offset(x = (-4).dp, y = (-4).dp)
+                        .size(36.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
+                        .background(Color.Black)
+                        .border(2.dp, Color(0xFFF9F9F9), CircleShape)
+                        .clickable { galleryLauncher.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
+                    Icon(
+                        Icons.Default.Edit, 
+                        contentDescription = "Edit Profile", 
+                        tint = Color.White, 
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
 
+            Text(
+                text = user?.fullName ?: "Citizen", 
+                style = MaterialTheme.typography.titleLarge, 
+                fontWeight = FontWeight.Bold, 
+                color = Color(0xFF1A1A1A),
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+            
+            Text(
+                text = if (user?.isAdmin == true) "System Administrator" else "Citizen Advocate", 
+                style = MaterialTheme.typography.bodyMedium, 
+                color = Color(0xFF494949),
+                fontWeight = FontWeight.Medium
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text(user?.fullName ?: "Citizen", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-            Text(if (user?.isAdmin == true) "System Administrator" else "Citizen Advocate", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Info Cards
-            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            // User Details Cards
+            Column(
+                modifier = Modifier.fillMaxWidth(), 
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 InfoCard("Full Name", user?.fullName ?: "N/A")
                 InfoCard("Email Address", user?.email ?: "N/A")
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Settings Links
-            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("ACCOUNT SETTINGS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
-                SettingLink(Icons.Default.Notifications, "Notification Preferences")
-                SettingLink(Icons.Default.Gavel, "Privacy Policy")
-                SettingLink(Icons.Default.Help, "Contact Support")
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -166,18 +213,30 @@ fun ProfileScreen(
             // Logout Button
             Button(
                 onClick = { viewModel.logout() },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .shadow(4.dp, RoundedCornerShape(16.dp)),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFB3261E),
+                    contentColor = Color.White
+                ),
+                contentPadding = PaddingValues(0.dp)
             ) {
-                Icon(Icons.Default.Logout, contentDescription = null)
-                Spacer(modifier = Modifier.width(12.dp))
-                Text("Logout", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ExitToApp,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Logout", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Version 2.4.1", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
@@ -187,36 +246,27 @@ fun InfoCard(label: String, value: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.2f), RoundedCornerShape(12.dp))
-            .padding(20.dp)
+            .shadow(elevation = 1.dp, shape = RoundedCornerShape(16.dp), clip = false)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .border(1.dp, Color(0xFFF4F3F3), RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Column {
-            Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+            Text(
+                text = label.uppercase(), 
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold, 
+                color = Color(0xFF9CA3AF),
+                letterSpacing = 0.5.sp
+            )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                text = value, 
+                fontSize = 14.sp, 
+                fontWeight = FontWeight.SemiBold, 
+                color = Color(0xFF1A1A1A)
+            )
         }
-    }
-}
-
-@Composable
-fun SettingLink(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.2f), RoundedCornerShape(12.dp))
-            .clickable { /* TODO */ }
-            .padding(20.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-        }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
     }
 }

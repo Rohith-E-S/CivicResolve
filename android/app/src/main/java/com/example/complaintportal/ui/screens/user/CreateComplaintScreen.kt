@@ -48,6 +48,7 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.views.overlay.MapEventsOverlay
+import org.osmdroid.tileprovider.tilesource.XYTileSource
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
@@ -327,8 +328,24 @@ fun CreateComplaintScreen(
                     Box(modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(8.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))) {
                         AndroidView(
                             factory = { ctx ->
-                                Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
+                                Configuration.getInstance().apply {
+                                    load(ctx, ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
+                                    userAgentValue = ctx.packageName
+                                }
+
+                                val CARTO_TILE_SOURCE = XYTileSource(
+                                    "CartoLight",
+                                    0, 19, 256, ".png",
+                                    arrayOf(
+                                        "https://a.basemaps.cartocdn.com/rastertiles/voyager/",
+                                        "https://b.basemaps.cartocdn.com/rastertiles/voyager/",
+                                        "https://c.basemaps.cartocdn.com/rastertiles/voyager/"
+                                    ),
+                                    "© OpenStreetMap contributors © CARTO"
+                                )
+
                                 MapView(ctx).apply {
+                                    setTileSource(CARTO_TILE_SOURCE)
                                     setMultiTouchControls(true)
                                     val mapController = controller
                                     mapController.setZoom(15.0)
