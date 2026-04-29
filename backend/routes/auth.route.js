@@ -1,16 +1,16 @@
 import express from "express";
 import {
-  sendOtp,
-  verifyOtp,
-  createAccount,
-  login,
-  logout,
-  updateProfile,
-  checkAuth,
-  googleLogin,
-  verifyPasswordResetOtp,
-  sendPasswordResetOtp,
-  resetPassword,
+   sendOtp,
+   verifyOtp,
+   createAccount,
+   login,
+   logout,
+   updateProfile,
+   checkAuth,
+   googleLogin,
+   verifyPasswordResetOtp,
+   sendPasswordResetOtp,
+   resetPassword,
 } from "../controllers/user.controller.js";
 
 import { protectRoute } from "../middleware/auth.middleware.js";
@@ -32,10 +32,10 @@ authRouter.get("/check-auth", protectRoute, checkAuth);
 
 // UPDATE PROFILE
 authRouter.post(
-  "/update",
-  protectRoute,
-  upload.single("profilePic"),
-  updateProfile
+   "/update",
+   protectRoute,
+   upload.single("profilePic"),
+   updateProfile,
 );
 
 // GOOGLE OAUTH
