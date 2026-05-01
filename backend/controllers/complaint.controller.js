@@ -1,4 +1,3 @@
-import { log } from "console";
 import cloudinary from "../config/cloudinary.js";
 import Complaint from "../models/complaint.model.js";
 import Message from "../models/message.model.js";
@@ -15,6 +14,21 @@ import {
   hasKeyword,
 } from "../config/constants.js";
 import { sendMail } from "../config/email.js";
+
+const ACTIVE_COMPLAINT_QUERY = { isDeleted: { $ne: true } };
+const toRadians = (degree) => (degree * Math.PI) / 180;
+const haversineDistanceKm = (lat1, lon1, lat2, lon2) => {
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLon / 2) ** 2;
+
+  return earthRadiusKm * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+};
 
 // Create a Complaint
 export const createComplaint = async (req, res) => {
@@ -111,9 +125,10 @@ export const createComplaint = async (req, res) => {
 // Get LoggedIn User complaints
 export const getMyComplaint = async (req, res) => {
   try {
-    const complaints = await Complaint.find({ user: req.user._id }).populate(
-      "user"
-    );
+    const complaints = await Complaint.find({
+      user: req.user._id,
+      ...ACTIVE_COMPLAINT_QUERY,
+    }).populate("user");
     if (!complaints) {
       return res
         .status(404)
@@ -143,7 +158,9 @@ export const getAllComplaints = async (req, res) => {
         .json({ success: false, message: "Only Admin can access this API" });
     }
 
-    const complaints = await Complaint.find().populate("user");
+    const complaints = await Complaint.find(ACTIVE_COMPLAINT_QUERY).populate(
+      "user"
+    );
 
     if (!complaints) {
       return res
@@ -260,7 +277,7 @@ export const filterComplaintOnStateCity = async (req, res) => {
       fetchValue = city;
     }
 
-    const query = { [fetchField]: fetchValue };
+    const query = { [fetchField]: fetchValue, ...ACTIVE_COMPLAINT_QUERY };
 
     const complaints = await Complaint.find(query).populate("user");
 
@@ -302,7 +319,10 @@ export const updateComplaintStatus = async (req, res) => {
         .json({ success: false, message: "Invalid  status value" });
     }
 
-    const complaint = await Complaint.findById(complaintId);
+    const complaint = await Complaint.findOne({
+      _id: complaintId,
+      ...ACTIVE_COMPLAINT_QUERY,
+    });
 
     if (!complaint) {
       return res
@@ -317,8 +337,8 @@ export const updateComplaintStatus = async (req, res) => {
       });
     }
 
-    const updateComplaint = await Complaint.findByIdAndUpdate(
-      complaintId,
+    const updateComplaint = await Complaint.findOneAndUpdate(
+      { _id: complaintId, ...ACTIVE_COMPLAINT_QUERY },
       { status },
       { new: true }
     );
@@ -354,7 +374,10 @@ export const updateAfterImageUrl = async (req, res) => {
         .json({ success: false, message: "Please provide a complaintId" });
     }
 
-    const complaint = await Complaint.findById(complaintId);
+    const complaint = await Complaint.findOne({
+      _id: complaintId,
+      ...ACTIVE_COMPLAINT_QUERY,
+    });
 
     if (!complaint) {
       return res
@@ -417,7 +440,10 @@ export const updateComplaint = async (req, res) => {
     const complaintId = req.params.id;
     const { status } = req.body;
 
-    const complaint = await Complaint.findById(complaintId).populate("user");
+    const complaint = await Complaint.findOne({
+      _id: complaintId,
+      ...ACTIVE_COMPLAINT_QUERY,
+    }).populate("user");
 
     if (!complaint) {
       return res.status(404).json({
@@ -525,7 +551,10 @@ export const getComplaint = async (req, res) => {
   try {
     const complaintId = req.params.id;
 
-    const complaint = await Complaint.findById(complaintId).populate("user");
+    const complaint = await Complaint.findOne({
+      _id: complaintId,
+      ...ACTIVE_COMPLAINT_QUERY,
+    }).populate("user");
 
     if (!complaint) {
       return res
@@ -561,7 +590,10 @@ export const rateComplaint = async (req, res) => {
       });
     }
 
-    const complaint = await Complaint.findById(complaintId);
+    const complaint = await Complaint.findOne({
+      _id: complaintId,
+      ...ACTIVE_COMPLAINT_QUERY,
+    });
 
     if (!complaint) {
       return res.status(404).json({
@@ -604,7 +636,7 @@ export const getComplaintStats = async (req, res) => {
       });
     }
 
-    const complaints = await Complaint.find();
+    const complaints = await Complaint.find(ACTIVE_COMPLAINT_QUERY);
 
     const newComplaint = complaints.filter((c) => c.status === "new");
     const inProgressComplaint = complaints.filter(
@@ -642,7 +674,7 @@ export const getPaginatedComplaints = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const status = req.query.status;
 
-    const query = {};
+    const query = { ...ACTIVE_COMPLAINT_QUERY };
     if (status && status !== "all") {
       query.status = status;
     }
@@ -700,7 +732,10 @@ export const getPaginatedComplaints = async (req, res) => {
 // Get User Complaint Stats
 export const getMyComplaintStats = async (req, res) => {
   try {
-    const complaints = await Complaint.find({ user: req.user._id });
+    const complaints = await Complaint.find({
+      user: req.user._id,
+      ...ACTIVE_COMPLAINT_QUERY,
+    });
 
     const newComplaint = complaints.filter((c) => c.status === "new");
     const inProgressComplaint = complaints.filter(
@@ -732,7 +767,7 @@ export const getMyPaginatedComplaints = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const status = req.query.status;
 
-    const query = { user: req.user._id };
+    const query = { user: req.user._id, ...ACTIVE_COMPLAINT_QUERY };
     if (status && status !== "all") {
       query.status = status;
     }
@@ -781,7 +816,7 @@ export const getComplaintsWithMessages = async (req, res) => {
     // 1. Get distinct complaint IDs that have messages
     const complaintIds = await Message.distinct("complaintId");
 
-    const query = { _id: { $in: complaintIds } };
+    const query = { _id: { $in: complaintIds }, ...ACTIVE_COMPLAINT_QUERY };
     if (status && status !== "all") {
       query.status = status;
     }
@@ -829,6 +864,7 @@ export const getMyComplaintsWithMessages = async (req, res) => {
     const query = {
       _id: { $in: complaintIds },
       user: req.user._id, // Ensure it's their own complaint
+      ...ACTIVE_COMPLAINT_QUERY,
     };
 
     if (status && status !== "all") {
@@ -858,6 +894,258 @@ export const getMyComplaintsWithMessages = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: `Error fetching user active chats: ${error.message}`,
+    });
+  }
+};
+
+// Update current user's complaint details (only while complaint is new)
+export const updateMyComplaint = async (req, res) => {
+  try {
+    const complaintId = req.params.id;
+    const complaint = await Complaint.findOne({
+      _id: complaintId,
+      user: req.user._id,
+      ...ACTIVE_COMPLAINT_QUERY,
+    });
+
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
+    }
+
+    if (complaint.status !== "new") {
+      return res.status(400).json({
+        success: false,
+        message: "Only new complaints can be edited",
+      });
+    }
+
+    const allowedFields = [
+      "description",
+      "latitude",
+      "longitude",
+      "city",
+      "state",
+      "landmark",
+      "category",
+    ];
+
+    let updatedFieldCount = 0;
+    allowedFields.forEach((field) => {
+      if (typeof req.body[field] !== "string") {
+        return;
+      }
+
+      const value = req.body[field].trim();
+      if (!value) {
+        return;
+      }
+
+      complaint[field] = value;
+      updatedFieldCount += 1;
+    });
+
+    if (!updatedFieldCount) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide at least one valid field to update",
+      });
+    }
+
+    await complaint.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Complaint updated successfully",
+      complaint,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: `Error updating complaint: ${error.message}`,
+    });
+  }
+};
+
+// Soft delete current user's complaint (only while complaint is new)
+export const deleteMyComplaint = async (req, res) => {
+  try {
+    const complaintId = req.params.id;
+    const complaint = await Complaint.findOne({
+      _id: complaintId,
+      user: req.user._id,
+      ...ACTIVE_COMPLAINT_QUERY,
+    });
+
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
+    }
+
+    if (complaint.status !== "new") {
+      return res.status(400).json({
+        success: false,
+        message: "Only new complaints can be deleted",
+      });
+    }
+
+    complaint.isDeleted = true;
+    complaint.deletedAt = new Date();
+    complaint.deletedBy = req.user._id;
+    await complaint.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Complaint deleted successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: `Error deleting complaint: ${error.message}`,
+    });
+  }
+};
+
+// Nearby complaint discovery
+export const getNearbyComplaints = async (req, res) => {
+  try {
+    const latitude = Number.parseFloat(req.query.lat);
+    const longitude = Number.parseFloat(req.query.lng);
+    const radius = Number.parseFloat(req.query.radius || "3");
+    const limit = Math.min(Number.parseInt(req.query.limit || "20", 10), 100);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return res.status(400).json({
+        success: false,
+        message: "lat and lng query params are required and must be valid numbers",
+      });
+    }
+
+    if (!Number.isFinite(radius) || radius <= 0 || radius > 50) {
+      return res.status(400).json({
+        success: false,
+        message: "radius must be a number between 0 and 50 (km)",
+      });
+    }
+
+    if (!Number.isInteger(limit) || limit <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "limit must be a positive integer",
+      });
+    }
+
+    const query = { ...ACTIVE_COMPLAINT_QUERY };
+    if (req.query.status && req.query.status !== "all") {
+      query.status = req.query.status;
+    }
+    if (req.query.category && req.query.category !== "all") {
+      query.category = req.query.category;
+    }
+
+    const complaints = await Complaint.find(query)
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .populate("user", "fullName profilePic");
+
+    const nearbyComplaints = complaints
+      .map((complaint) => {
+        const complaintLat = Number.parseFloat(complaint.latitude);
+        const complaintLng = Number.parseFloat(complaint.longitude);
+
+        if (!Number.isFinite(complaintLat) || !Number.isFinite(complaintLng)) {
+          return null;
+        }
+
+        const distanceKm = haversineDistanceKm(
+          latitude,
+          longitude,
+          complaintLat,
+          complaintLng
+        );
+
+        if (distanceKm > radius) {
+          return null;
+        }
+
+        const obj = complaint.toObject();
+        return {
+          ...obj,
+          distanceKm: Number(distanceKm.toFixed(2)),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.distanceKm - b.distanceKm)
+      .slice(0, limit);
+
+    return res.status(200).json({
+      success: true,
+      complaints: nearbyComplaints,
+      meta: {
+        radiusKm: radius,
+        count: nearbyComplaints.length,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: `Error fetching nearby complaints: ${error.message}`,
+    });
+  }
+};
+
+// Support/upvote a complaint to signal duplicate impact
+export const supportComplaint = async (req, res) => {
+  try {
+    const complaintId = req.params.id;
+    const complaint = await Complaint.findOne({
+      _id: complaintId,
+      ...ACTIVE_COMPLAINT_QUERY,
+    });
+
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
+    }
+
+    if (complaint.user.toString() === req.user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot support your own complaint",
+      });
+    }
+
+    const alreadySupported = complaint.supporters.some(
+      (userId) => userId.toString() === req.user._id.toString()
+    );
+
+    if (alreadySupported) {
+      return res.status(200).json({
+        success: true,
+        message: "Complaint already supported",
+        supportCount: complaint.supportCount,
+      });
+    }
+
+    complaint.supporters.push(req.user._id);
+    complaint.supportCount = complaint.supporters.length;
+    await complaint.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Complaint supported successfully",
+      supportCount: complaint.supportCount,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: `Error supporting complaint: ${error.message}`,
     });
   }
 };

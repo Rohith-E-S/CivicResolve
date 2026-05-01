@@ -1,14 +1,18 @@
 import express from "express";
 import {
    createComplaint,
+   deleteMyComplaint,
    filterComplaintOnStateCity,
    getAllComplaints,
+   getNearbyComplaints,
    getComplaint,
    getMyComplaint,
    updateAfterImageUrl,
    updateComplaint,
+   updateMyComplaint,
    updateComplaintStatus,
    rateComplaint,
+   supportComplaint,
    getComplaintStats,
    getPaginatedComplaints,
    getMyComplaintStats,
@@ -77,5 +81,10 @@ complaintRouter.get(
    getMyComplaintsWithMessages,
 );
 complaintRouter.get("/my-list", protectRoute, getMyPaginatedComplaints);
+
+complaintRouter.get("/nearby", protectRoute, getNearbyComplaints);
+complaintRouter.patch("/:id", protectRoute, updateMyComplaint);
+complaintRouter.delete("/:id", protectRoute, deleteMyComplaint);
+complaintRouter.post("/:id/support", protectRoute, supportComplaint);
 
 export default complaintRouter;

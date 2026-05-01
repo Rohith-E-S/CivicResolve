@@ -81,9 +81,37 @@ const complaintSchema = new mongoose.Schema(
       max: 5,
       default: 0,
     },
+    supportCount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    supporters: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   { timestamps: true }
 );
+
+complaintSchema.index({ isDeleted: 1, createdAt: -1 });
+complaintSchema.index({ city: 1, state: 1, category: 1, status: 1, isDeleted: 1 });
 
 const Complaint = mongoose.model("Complaint", complaintSchema);
 export default Complaint;
