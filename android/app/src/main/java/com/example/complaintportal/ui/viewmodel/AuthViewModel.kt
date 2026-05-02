@@ -19,7 +19,9 @@ data class AuthState(
     val isLoading: Boolean = false,
     val isAuthenticated: Boolean = false,
     val user: User? = null,
-    val error: String? = null
+    val error: String? = null,
+    val isOnboardingComplete: Boolean = false,
+    val detectedDistrict: String? = null
 )
 
 class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
@@ -88,7 +90,9 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
                     _authState.value = _authState.value.copy(
                         isChecking = false,
                         isAuthenticated = true,
-                        user = response.user
+                        user = response.user,
+                        isOnboardingComplete = !response.user.homeDistrict.isNullOrBlank(),
+                        detectedDistrict = response.user.homeDistrict
                     )
                 } else {
                     _authState.value = _authState.value.copy(
@@ -114,7 +118,9 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
                     _authState.value = _authState.value.copy(
                         isLoading = false,
                         isAuthenticated = true,
-                        user = response.user
+                        user = response.user,
+                        isOnboardingComplete = !response.user?.homeDistrict.isNullOrBlank(),
+                        detectedDistrict = response.user?.homeDistrict
                     )
                     onSuccess()
                 } else {
@@ -141,7 +147,9 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
                     _authState.value = _authState.value.copy(
                         isLoading = false,
                         isAuthenticated = true,
-                        user = response.user
+                        user = response.user,
+                        isOnboardingComplete = !response.user?.homeDistrict.isNullOrBlank(),
+                        detectedDistrict = response.user?.homeDistrict
                     )
                     onSuccess()
                 } else {
@@ -168,7 +176,9 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
                     _authState.value = _authState.value.copy(
                         isLoading = false,
                         isAuthenticated = true,
-                        user = response.user
+                        user = response.user,
+                        isOnboardingComplete = !response.user?.homeDistrict.isNullOrBlank(),
+                        detectedDistrict = response.user?.homeDistrict
                     )
                     onSuccess()
                 } else {
@@ -264,6 +274,27 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
             _authState.value = _authState.value.copy(isLoading = true)
             repository.logout()
             _authState.value = AuthState(isChecking = false)
+        }
+    }
+
+    fun completeOnboarding(district: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _authState.value = _authState.value.copy(isLoading = true, error = null)
+            val result = repository.updateHomeDistrict(district)
+            result.onSuccess { response ->
+                _authState.value = _authState.value.copy(
+                    isLoading = false,
+                    isOnboardingComplete = true,
+                    detectedDistrict = district,
+                    user = response.user
+                )
+                onSuccess()
+            }.onFailure { e ->
+                _authState.value = _authState.value.copy(
+                    isLoading = false,
+                    error = e.localizedMessage ?: "Connection error. Please check your internet."
+                )
+            }
         }
     }
 

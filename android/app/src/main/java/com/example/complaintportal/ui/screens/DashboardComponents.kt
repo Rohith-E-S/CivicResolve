@@ -2,176 +2,72 @@ package com.example.complaintportal.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.filled.ImageNotSupported
-import androidx.compose.material.icons.filled.LocationCity
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.rememberAsyncImagePainter
+import kotlinx.coroutines.launch
+import com.example.complaintportal.data.model.Complaint
+import com.github.mikephil.charting.data.PieEntry
+import com.github.mikephil.charting.data.PieDataSet
+import com.github.mikephil.charting.data.PieData
+import com.github.mikephil.charting.formatter.PercentFormatter
+import com.github.mikephil.charting.utils.ColorTemplate
+import com.github.mikephil.charting.charts.PieChart
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import coil.compose.rememberAsyncImagePainter
-import com.example.complaintportal.data.model.Complaint
-import com.example.complaintportal.ui.theme.bounceClick
-import com.example.complaintportal.ui.theme.shimmerEffect
-
-enum class SortOption {
-    DATE_DESC, DATE_ASC, RATING_DESC
-}
+import com.example.complaintportal.R
 
 @Composable
-fun ZoomableImageDialog(
-    imageUrl: String,
-    onDismiss: () -> Unit
-) {
-    var scale by remember { mutableStateOf(1f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
-    val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
-        scale = (scale * zoomChange).coerceIn(1f, 5f)
-        offset += offsetChange * scale
-    }
+fun Modifier.shimmerEffect(): Modifier {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translateAnim by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer"
+    )
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.9f))
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onDoubleTap = {
-                            scale = if (scale > 1f) 1f else 2f
-                            offset = Offset.Zero
-                        }
-                    )
-                }
-        ) {
-            Image(
-                painter = rememberAsyncImagePainter(imageUrl),
-                contentDescription = "Zoomable Image",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale,
-                        translationX = offset.x,
-                        translationY = offset.y
-                    )
-                    .transformable(state = transformableState),
-                contentScale = ContentScale.Fit
-            )
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-            ) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-            }
-        }
-    }
-}
+    val shimmerColors = listOf(
+        Color.LightGray.copy(alpha = 0.6f),
+        Color.LightGray.copy(alpha = 0.2f),
+        Color.LightGray.copy(alpha = 0.6f),
+    )
 
-@Composable
-fun StatCard(
-    title: String,
-    count: String,
-    color: Color,
-    isSelected: Boolean = false,
-    onClick: () -> Unit = {}
-) {
-    val backgroundColor = if (isSelected) color.copy(alpha = 0.2f) else color.copy(alpha = 0.05f)
-    val contentColor = if (isSelected) color else color.copy(alpha = 0.8f)
-
-    Row(
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(backgroundColor)
-            .then(if (isSelected) Modifier.border(1.5.dp, color, CircleShape) else Modifier)
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(contentColor))
-        Text(title, style = MaterialTheme.typography.labelLarge, color = contentColor, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium)
-        Text(count, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = contentColor)
-    }
-}
-
-
-@Composable
-fun AnimatedLikeButton(
-    isLiked: Boolean,
-    likeCount: Int,
-    onLikeClick: () -> Unit
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .bounceClick { onLikeClick() }
-            .padding(4.dp)
-    ) {
-        val iconTint by animateColorAsState(
-            targetValue = if (isLiked) Color.Red else Color.Gray,
-            animationSpec = tween(200),
-            label = "likeTint"
+    return this.background(
+        brush = Brush.linearGradient(
+            colors = shimmerColors,
+            start = androidx.compose.ui.geometry.Offset(translateAnim, translateAnim),
+            end = androidx.compose.ui.geometry.Offset(translateAnim + 500f, translateAnim + 500f)
         )
-        Icon(
-            imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-            contentDescription = "Like",
-            tint = iconTint,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-
-        AnimatedContent(
-            targetState = likeCount,
-            transitionSpec = {
-                if (targetState > initialState) {
-                    (slideInVertically { height -> height } + fadeIn()).togetherWith(slideOutVertically { height -> -height } + fadeOut())
-                } else {
-                    (slideInVertically { height -> -height } + fadeIn()).togetherWith(slideOutVertically { height -> height } + fadeOut())
-                }
-            },
-            label = "likeCount"
-        ) { count ->
-            Text(text = count.toString(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
+    )
 }
 
 @Composable
@@ -205,7 +101,10 @@ fun ShimmerComplaintCard() {
                     Spacer(modifier = Modifier.height(4.dp))
                     Box(modifier = Modifier.height(14.dp).fillMaxWidth(0.6f).clip(RoundedCornerShape(4.dp)).shimmerEffect())
                 }
-                Box(modifier = Modifier.height(12.dp).fillMaxWidth(0.5f).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Box(modifier = Modifier.size(60.dp, 12.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                    Box(modifier = Modifier.size(40.dp, 12.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                }
             }
         }
     }
@@ -218,7 +117,9 @@ fun ComplaintCard(
     isAdmin: Boolean, 
     onClick: () -> Unit, 
     onUpdateStatusClick: () -> Unit,
-    showCommunityFeatures: Boolean = false
+    showCommunityFeatures: Boolean = false,
+    isSupported: Boolean = false,
+    onSupportClick: () -> Unit = {}
 ) {
     val sharedTransitionScope = com.example.complaintportal.ui.navigation.LocalSharedTransitionScope.current
     val animatedVisibilityScope = com.example.complaintportal.ui.navigation.LocalNavAnimatedVisibilityScope.current
@@ -300,13 +201,22 @@ fun ComplaintCard(
                 modifier = Modifier
                     .weight(0.6f)
                     .fillMaxHeight()
-                    .padding(12.dp)
+                    .padding(10.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
+                        if (showCommunityFeatures) {
+                            Text(
+                                text = "Citizen in ${complaint.city}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha=0.7f),
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+                        }
                         Text(
                             text = complaint.category,
                             style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
@@ -314,7 +224,7 @@ fun ComplaintCard(
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(end = 24.dp)
+                            modifier = Modifier.padding(end = if (isAdmin || showCommunityFeatures) 48.dp else 0.dp)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
@@ -327,21 +237,38 @@ fun ComplaintCard(
                     }
 
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.outline,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "${complaint.city}, ${complaint.state}",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                color = MaterialTheme.colorScheme.outline,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "${complaint.city}, ${complaint.state}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = MaterialTheme.colorScheme.outline,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (showCommunityFeatures) {
+                                Text(
+                                    text = "${(100..900).random()}m away",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha=0.3f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
                         }
                         
                         val dateString = try {
@@ -361,26 +288,23 @@ fun ComplaintCard(
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            
-                            if (showCommunityFeatures) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Favorite,
-                                        contentDescription = "Support",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "${(10..99).random()} people support",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
                         }
                     }
+                }
+
+                if (showCommunityFeatures) {
+                    PriorityUpvoteButton(
+                        supportCount = complaint.supportCount ?: 0,
+                        onSupportClick = onSupportClick,
+                        isSupported = isSupported,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .graphicsLayer {
+                                scaleX = 0.7f
+                                scaleY = 0.7f
+                            }
+                            .offset(x = 8.dp, y = (-8).dp)
+                    )
                 }
 
                 // Quick Actions Menu / Admin Update Status Button
@@ -389,7 +313,6 @@ fun ComplaintCard(
                         onClick = onUpdateStatusClick,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .offset(x = 12.dp, y = (-12).dp)
                     ) {
                         Icon(
                             Icons.Default.MoreVert,
@@ -451,5 +374,147 @@ fun CustomPullToRefreshIndicator(
                     rotationZ = if (isRefreshing) rotation else state.distanceFraction * 360f
                 }
         )
+    }
+}
+
+enum class SortOption {
+    DATE_DESC, DATE_ASC, RATING_DESC
+}
+
+@Composable
+fun StatCard(
+    title: String,
+    count: String,
+    color: Color,
+    isSelected: Boolean = false,
+    onClick: () -> Unit = {}
+) {
+    val backgroundColor = if (isSelected) color.copy(alpha = 0.2f) else color.copy(alpha = 0.05f)
+    val contentColor = if (isSelected) color else color.copy(alpha = 0.8f)
+
+    Row(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(backgroundColor)
+            .then(if (isSelected) Modifier.border(1.5.dp, color, CircleShape) else Modifier)
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(contentColor))
+        Text(title, style = MaterialTheme.typography.labelLarge, color = contentColor, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium)
+        Text(count, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = contentColor)
+    }
+}
+
+@Composable
+fun PriorityUpvoteButton(
+    supportCount: Int,
+    onSupportClick: () -> Unit,
+    isSupported: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val count by animateIntAsState(
+        targetValue = supportCount,
+        label = "count"
+    )
+
+    val scale = remember { Animatable(1f) }
+    val scope = rememberCoroutineScope()
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (isSupported) MaterialTheme.colorScheme.primaryContainer 
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            )
+            .clickable {
+                onSupportClick()
+                scope.launch {
+                    if (!isSupported) {
+                        scale.animateTo(1.2f, tween(100))
+                        scale.animateTo(1f, spring(Spring.DampingRatioMediumBouncy))
+                    } else {
+                        scale.animateTo(0.8f, tween(100))
+                        scale.animateTo(1f, spring(Spring.DampingRatioLowBouncy))
+                    }
+                }
+            }
+            .padding(vertical = 8.dp, horizontal = 12.dp)
+            .graphicsLayer {
+                scaleX = scale.value
+                scaleY = scale.value
+            },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.KeyboardArrowUp,
+            contentDescription = "Upvote",
+            tint = if (isSupported) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(28.dp)
+        )
+        AnimatedContent(
+            targetState = count,
+            transitionSpec = {
+                if (targetState > initialState) {
+                    slideInVertically { height -> height } + fadeIn() togetherWith
+                            slideOutVertically { height -> -height } + fadeOut()
+                } else {
+                    slideInVertically { height -> -height } + fadeIn() togetherWith
+                            slideOutVertically { height -> height } + fadeOut()
+                }.using(
+                    SizeTransform(clip = false)
+                )
+            },
+            label = "counter"
+        ) { targetCount ->
+            Text(
+                text = "$targetCount",
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                fontWeight = FontWeight.ExtraBold,
+                color = if (isSupported) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun ZoomableImageDialog(imageUrl: String, onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.9f))
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = rememberAsyncImagePainter(imageUrl),
+                contentDescription = "Zoomed Image",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(enabled = false) {},
+                contentScale = ContentScale.Fit
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = Color.White
+                )
+            }
+        }
     }
 }

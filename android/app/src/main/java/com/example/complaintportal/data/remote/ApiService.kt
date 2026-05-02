@@ -35,6 +35,9 @@ interface ApiService {
     @POST("auth/logout")
     suspend fun logout(): Response<BaseResponse>
 
+    @POST("auth/update-home-district")
+    suspend fun updateHomeDistrict(@Body request: Map<String, String>): Response<AuthResponse>
+
     @GET("auth/check-auth")
     suspend fun checkAuth(): Response<AuthResponse>
 
@@ -89,11 +92,17 @@ interface ApiService {
     @GET("complaint/get-complaint-data/{id}")
     suspend fun getComplaint(@Path("id") id: String): Response<SingleComplaintResponse>
 
+    @GET("complaint/public-stats")
+    suspend fun getPublicStats(): Response<PublicStatsResponse>
+
     @POST("complaint/rate/{id}")
     suspend fun rateComplaint(
         @Path("id") id: String,
         @Body request: Map<String, Int>
     ): Response<BaseResponse>
+
+    @POST("complaint/support/{id}")
+    suspend fun supportComplaint(@Path("id") id: String): Response<BaseResponse>
 
     @GET("complaint/admin/stats")
     suspend fun getAdminComplaintStats(): Response<AdminComplaintStatsResponse>

@@ -70,6 +70,7 @@ dependencies {
     implementation(libs.mpandroidchart)
     implementation(libs.play.services.location)
     implementation(libs.lottie.compose)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

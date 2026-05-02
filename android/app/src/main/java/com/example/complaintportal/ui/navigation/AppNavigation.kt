@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -40,6 +41,7 @@ sealed class Screen(val route: String) {
     object ForgotPassword : Screen("forgot_password")
     object Dashboard : Screen("dashboard")
     object Profile : Screen("profile")
+    object Onboarding : Screen("onboarding")
     object CreateComplaint : Screen("create_complaint")
     object ComplaintDetail : Screen("complaint_detail/{complaintId}") {
         fun createRoute(complaintId: String) = "complaint_detail/$complaintId"
@@ -153,30 +155,39 @@ fun AppNavigation(
 
             composable(Screen.Dashboard.route) {
                 CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
-                    if (authState.user?.isAdmin == true) {
-                        AdminDashboardScreen(
-                            viewModel = complaintViewModel,
-                            onNavigateToDetail = { complaintId -> 
-                                if (complaintId == "profile") {
-                                    navController.navigate(Screen.Profile.route)
-                                } else {
-                                    navController.navigate(Screen.ComplaintDetail.createRoute(complaintId)) 
-                                }
+                    if (authState.isAuthenticated && !authState.isOnboardingComplete) {
+                        LaunchedEffect(Unit) {
+                            navController.navigate(Screen.Onboarding.route) {
+                                popUpTo(Screen.Dashboard.route) { inclusive = true }
                             }
-                        )
-                    } else {
-                        UserDashboardScreen(
-                            viewModel = complaintViewModel,
-                            userName = authState.user?.fullName ?: "Citizen",
-                            onNavigateToCreate = { navController.navigate(Screen.CreateComplaint.route) },
-                            onNavigateToDetail = { complaintId -> 
-                                if (complaintId == "profile") {
-                                    navController.navigate(Screen.Profile.route)
-                                } else {
-                                    navController.navigate(Screen.ComplaintDetail.createRoute(complaintId)) 
+                        }
+                    } else if (authState.isAuthenticated) {
+                        if (authState.user?.isAdmin == true) {
+                            AdminDashboardScreen(
+                                viewModel = complaintViewModel,
+                                onNavigateToDetail = { complaintId -> 
+                                    if (complaintId == "profile") {
+                                        navController.navigate(Screen.Profile.route)
+                                    } else {
+                                        navController.navigate(Screen.ComplaintDetail.createRoute(complaintId)) 
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        } else {
+                            UserDashboardScreen(
+                                viewModel = complaintViewModel,
+                                userName = authState.user?.fullName ?: "Citizen",
+                                district = authState.detectedDistrict,
+                                onNavigateToCreate = { navController.navigate(Screen.CreateComplaint.route) },
+                                onNavigateToDetail = { complaintId -> 
+                                    if (complaintId == "profile") {
+                                        navController.navigate(Screen.Profile.route)
+                                    } else {
+                                        navController.navigate(Screen.ComplaintDetail.createRoute(complaintId)) 
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -188,10 +199,22 @@ fun AppNavigation(
                 )
             }
 
+            composable(Screen.Onboarding.route) {
+                LocationOnboardingScreen(
+                    viewModel = authViewModel,
+                    onOnboardingComplete = {
+                        navController.navigate(Screen.Dashboard.route) {
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
             composable(Screen.CreateComplaint.route) {
                 CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
                     CreateComplaintScreen(
                         viewModel = complaintViewModel,
+                        authViewModel = authViewModel,
                         onNavigateBack = { navController.popBackStack() },
                         onSuccess = {
                             navController.navigate(Screen.Dashboard.route) {

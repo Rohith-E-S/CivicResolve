@@ -18,6 +18,7 @@ data class Complaint(
     val category: String,
     val status: String,
     val rating: Int,
+    val supportCount: Int? = 0,
     val createdAt: String?,
     val updatedAt: String?
 )
@@ -79,6 +80,19 @@ data class AdminComplaintStatsResponse(
     val success: Boolean,
     val message: String?,
     val stats: AllComplaintsData?
+)
+
+@JsonClass(generateAdapter = true)
+data class PublicStats(
+    val totalResolved: Int,
+    val totalActive: Int
+)
+
+@JsonClass(generateAdapter = true)
+data class PublicStatsResponse(
+    val success: Boolean,
+    val message: String?,
+    val stats: PublicStats?
 )
 
 @JsonClass(generateAdapter = true)

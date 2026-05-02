@@ -9,12 +9,13 @@ import org.json.JSONObject
 
 class AuthRepository(private val apiService: ApiService, private val cookieJar: CookieJarImpl) {
 
-    private fun parseError(errorBody: String?): String {
+    private fun parseError(errorCode: Int, errorBody: String?): String {
+        if (errorBody.isNullOrBlank()) return "Server error ($errorCode)"
         return try {
-            val json = JSONObject(errorBody ?: "")
-            json.optString("message", "An error occurred")
+            val json = JSONObject(errorBody)
+            json.optString("message", "Error $errorCode: ${json.optString("error", "Unknown")}")
         } catch (e: Exception) {
-            "An error occurred"
+            "HTTP $errorCode: ${errorBody.take(100)}"
         }
     }
 
@@ -24,7 +25,7 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                val errorMsg = parseError(response.errorBody()?.string())
+                val errorMsg = parseError(response.code(), response.errorBody()?.string())
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
@@ -38,7 +39,7 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                val errorMsg = parseError(response.errorBody()?.string())
+                val errorMsg = parseError(response.code(), response.errorBody()?.string())
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
@@ -53,7 +54,7 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
                 response.body()?.token?.let { cookieJar.setToken(it) }
                 Result.success(response.body()!!)
             } else {
-                val errorMsg = parseError(response.errorBody()?.string())
+                val errorMsg = parseError(response.code(), response.errorBody()?.string())
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
@@ -68,7 +69,7 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
                 response.body()?.token?.let { cookieJar.setToken(it) }
                 Result.success(response.body()!!)
             } else {
-                val errorMsg = parseError(response.errorBody()?.string())
+                val errorMsg = parseError(response.code(), response.errorBody()?.string())
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
@@ -83,7 +84,7 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
                 response.body()?.token?.let { cookieJar.setToken(it) }
                 Result.success(response.body()!!)
             } else {
-                val errorMsg = parseError(response.errorBody()?.string())
+                val errorMsg = parseError(response.code(), response.errorBody()?.string())
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
@@ -97,7 +98,7 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                val errorMsg = parseError(response.errorBody()?.string())
+                val errorMsg = parseError(response.code(), response.errorBody()?.string())
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
@@ -111,7 +112,7 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                val errorMsg = parseError(response.errorBody()?.string())
+                val errorMsg = parseError(response.code(), response.errorBody()?.string())
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
@@ -125,7 +126,7 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                val errorMsg = parseError(response.errorBody()?.string())
+                val errorMsg = parseError(response.code(), response.errorBody()?.string())
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
@@ -140,7 +141,7 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                val errorMsg = parseError(response.errorBody()?.string())
+                val errorMsg = parseError(response.code(), response.errorBody()?.string())
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
@@ -155,7 +156,7 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                val errorMsg = parseError(response.errorBody()?.string())
+                val errorMsg = parseError(response.code(), response.errorBody()?.string())
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
@@ -173,7 +174,21 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                val errorMsg = parseError(response.errorBody()?.string())
+                val errorMsg = parseError(response.code(), response.errorBody()?.string())
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateHomeDistrict(district: String): Result<AuthResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.updateHomeDistrict(mapOf("district" to district))
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorMsg = parseError(response.code(), response.errorBody()?.string())
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {

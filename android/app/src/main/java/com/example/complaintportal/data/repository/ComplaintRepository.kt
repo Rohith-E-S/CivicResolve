@@ -116,9 +116,38 @@ class ComplaintRepository(private val apiService: ApiService) {
             }
         }
 
+    suspend fun supportComplaint(id: String): Result<BaseResponse> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = apiService.supportComplaint(id)
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!)
+                } else {
+                    val errorMsg = parseError(response.errorBody()?.string())
+                    Result.failure(Exception(errorMsg))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     suspend fun getComplaint(id: String): Result<SingleComplaintResponse> = withContext(Dispatchers.IO) {
         try {
             val response = apiService.getComplaint(id)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorMsg = parseError(response.errorBody()?.string())
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getPublicStats(): Result<PublicStatsResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getPublicStats()
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {

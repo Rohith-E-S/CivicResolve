@@ -18,7 +18,9 @@ data class ComplaintState(
     val inProgressComplaints: List<Complaint> = emptyList(),
     val resolvedComplaints: List<Complaint> = emptyList(),
     val currentComplaint: Complaint? = null,
-    val error: String? = null
+    val error: String? = null,
+    val supportedIds: Set<String> = emptySet(),
+    val communityResolvedCount: Int = 1200 // Default value
 )
 
 class ComplaintViewModel(private val repository: ComplaintRepository) : ViewModel() {
@@ -33,11 +35,17 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
             result.onSuccess { response ->
                 if (response.success) {
                     val complaints = response.complaints ?: emptyList()
+                    val supportedIds = _state.value.supportedIds
+                    
+                    val processedComplaints = complaints.map { 
+                        if (it.id in supportedIds && (it.supportCount ?: 0) == 0) it.copy(supportCount = 1) else it
+                    }
+
                     _state.value = _state.value.copy(
                         isLoading = false,
-                        newComplaints = complaints.filter { it.status.lowercase() == "new" },
-                        inProgressComplaints = complaints.filter { it.status.lowercase() == "in progress" },
-                        resolvedComplaints = complaints.filter { it.status.lowercase() == "resolved" }
+                        newComplaints = processedComplaints.filter { it.status.lowercase() == "new" },
+                        inProgressComplaints = processedComplaints.filter { it.status.lowercase() == "in progress" },
+                        resolvedComplaints = processedComplaints.filter { it.status.lowercase() == "resolved" }
                     )
                 } else {
                     _state.value = _state.value.copy(isLoading = false, error = response.message)
@@ -55,11 +63,19 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
             result.onSuccess { response ->
                 if (response.success) {
                     val data = response.complaints
+                    val supportedIds = _state.value.supportedIds
+                    
+                    val process = { list: List<Complaint>? ->
+                        list?.map { 
+                            if (it.id in supportedIds && (it.supportCount ?: 0) == 0) it.copy(supportCount = 1) else it
+                        } ?: emptyList()
+                    }
+
                     _state.value = _state.value.copy(
                         isLoading = false,
-                        newComplaints = data?.newComplaint ?: emptyList(),
-                        inProgressComplaints = data?.inProgressComplaint ?: emptyList(),
-                        resolvedComplaints = data?.resolvedComplaint ?: emptyList()
+                        newComplaints = process(data?.newComplaint),
+                        inProgressComplaints = process(data?.inProgressComplaint),
+                        resolvedComplaints = process(data?.resolvedComplaint)
                     )
                 } else {
                     _state.value = _state.value.copy(isLoading = false, error = response.message)
@@ -104,7 +120,13 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
             val result = repository.getComplaint(id)
             result.onSuccess { response ->
                 if (response.success) {
-                    _state.value = _state.value.copy(isLoading = false, currentComplaint = response.complaint)
+                    var complaint = response.complaint
+                    if (complaint != null && complaint.id in _state.value.supportedIds) {
+                        if ((complaint.supportCount ?: 0) == 0) {
+                            complaint = complaint.copy(supportCount = 1)
+                        }
+                    }
+                    _state.value = _state.value.copy(isLoading = false, currentComplaint = complaint)
                 } else {
                     _state.value = _state.value.copy(isLoading = false, error = response.message)
                 }
@@ -161,6 +183,64 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
                 }
             }.onFailure {
                 _state.value = _state.value.copy(isLoading = false, error = it.message)
+            }
+        }
+    }
+
+    fun supportComplaint(id: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            val currentState = _state.value
+            val isCurrentlySupported = id in currentState.supportedIds
+            
+            val delta = if (isCurrentlySupported) -1 else 1
+            val updatedSupportedIds = if (isCurrentlySupported) {
+                currentState.supportedIds - id
+            } else {
+                currentState.supportedIds + id
+            }
+            
+            val updateList = { list: List<Complaint> ->
+                list.map { 
+                    if (it.id == id) {
+                        val currentCount = it.supportCount ?: 0
+                        it.copy(supportCount = maxOf(0, currentCount + delta))
+                    } else it 
+                }
+            }
+            
+            _state.value = currentState.copy(
+                supportedIds = updatedSupportedIds,
+                newComplaints = updateList(currentState.newComplaints),
+                inProgressComplaints = updateList(currentState.inProgressComplaints),
+                resolvedComplaints = updateList(currentState.resolvedComplaints),
+                currentComplaint = if (currentState.currentComplaint?.id == id) {
+                    val currentCount = currentState.currentComplaint.supportCount ?: 0
+                    currentState.currentComplaint.copy(supportCount = maxOf(0, currentCount + delta))
+                } else currentState.currentComplaint
+            )
+            
+            val result = repository.supportComplaint(id)
+            result.onSuccess { response ->
+                if (response.success) {
+                    onSuccess()
+                } else {
+                    _state.value = _state.value.copy(error = response.message)
+                }
+            }.onFailure {
+                _state.value = _state.value.copy(error = it.message)
+            }
+        }
+    }
+
+    fun fetchPublicStats() {
+        viewModelScope.launch {
+            val result = repository.getPublicStats()
+            result.onSuccess { response ->
+                if (response.success && response.stats != null) {
+                    _state.value = _state.value.copy(
+                        communityResolvedCount = response.stats.totalResolved
+                    )
+                }
             }
         }
     }

@@ -10,6 +10,7 @@ data class User(
     val fullName: String?,
     val profilePic: String?,
     val address: String?,
+    val homeDistrict: String?,
     val isAdmin: Boolean? = false,
     val isVerified: Boolean? = false
 )

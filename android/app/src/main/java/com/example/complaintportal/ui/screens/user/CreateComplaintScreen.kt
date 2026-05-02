@@ -43,6 +43,7 @@ import android.speech.RecognizerIntent
 import android.widget.Toast
 import coil.compose.rememberAsyncImagePainter
 import com.example.complaintportal.ui.viewmodel.ComplaintViewModel
+import com.example.complaintportal.ui.viewmodel.AuthViewModel
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -72,10 +73,12 @@ import java.util.Locale
 @Composable
 fun CreateComplaintScreen(
     viewModel: ComplaintViewModel,
+    authViewModel: AuthViewModel,
     onNavigateBack: () -> Unit,
     onSuccess: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
+    val authState by authViewModel.authState.collectAsState()
     var description by rememberSaveable { mutableStateOf("") }
     var city by rememberSaveable { mutableStateOf("") }
     var userState by rememberSaveable { mutableStateOf("") }
@@ -85,6 +88,7 @@ fun CreateComplaintScreen(
     var lng by rememberSaveable { mutableStateOf("0.0") }
     var locationMessage by rememberSaveable { mutableStateOf("") }
     var showConfetti by rememberSaveable { mutableStateOf(false) }
+    var showOutOfBoundsDialog by remember { mutableStateOf(false) }
     var isVoiceActive by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -296,6 +300,18 @@ fun CreateComplaintScreen(
                 Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp)) {
                     Button(
                         onClick = {
+                            val homeDistrict = authState.detectedDistrict ?: ""
+                            val isWithinBounds = homeDistrict.isBlank() || 
+                                city.contains(homeDistrict, ignoreCase = true) || 
+                                userState.contains(homeDistrict, ignoreCase = true) ||
+                                homeDistrict.contains(city, ignoreCase = true) ||
+                                homeDistrict.contains(landmark, ignoreCase = true)
+
+                            if (!isWithinBounds && homeDistrict.isNotBlank()) {
+                                showOutOfBoundsDialog = true
+                                return@Button
+                            }
+
                             var imagePart: MultipartBody.Part? = null
                             selectedImageUri?.let { imgUri ->
                                 val inputStream = context.contentResolver.openInputStream(imgUri)
@@ -596,6 +612,22 @@ fun CreateComplaintScreen(
                     onSuccess()
                 }
             }
+        }
+        if (showOutOfBoundsDialog) {
+            AlertDialog(
+                onDismissRequest = { showOutOfBoundsDialog = false },
+                icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                title = { Text("Out of District") },
+                text = { 
+                    Text("You are currently outside your home district (${authState.detectedDistrict}). You can only report issues for your local community to ensure authorities can take action.") 
+                },
+                confirmButton = {
+                    Button(onClick = { showOutOfBoundsDialog = false }) {
+                        Text("I Understand")
+                    }
+                },
+                shape = RoundedCornerShape(24.dp)
+            )
         }
     }
 }

@@ -28,6 +28,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.ui.graphics.Color
 import com.example.complaintportal.ui.viewmodel.ComplaintViewModel
@@ -38,6 +40,7 @@ import kotlinx.coroutines.launch
 fun UserDashboardScreen(
     viewModel: ComplaintViewModel,
     userName: String,
+    district: String? = null,
     onNavigateToCreate: () -> Unit,
     onNavigateToDetail: (String) -> Unit
 ) {
@@ -51,10 +54,12 @@ fun UserDashboardScreen(
     
     val pagerState = rememberPagerState(pageCount = { 4 })
     val coroutineScope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
 
     val onRefresh = {
         isRefreshing = true
         viewModel.fetchUserComplaints()
+        viewModel.fetchPublicStats()
     }
 
     LaunchedEffect(state.isLoading) {
@@ -65,18 +70,48 @@ fun UserDashboardScreen(
 
     LaunchedEffect(Unit) {
         viewModel.fetchUserComplaints()
+        viewModel.fetchPublicStats()
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { 
-                    Text(
-                        "CivicResolve", 
-                        fontWeight = FontWeight.ExtraBold, 
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.headlineMedium
-                    ) 
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "CivicResolve", 
+                            fontWeight = FontWeight.ExtraBold, 
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                        if (district != null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.padding(top = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.LocationOn,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = district.split(" ").first(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                    }
                 },
                 actions = {
                     Box(
@@ -128,15 +163,24 @@ fun UserDashboardScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Hi, ", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(displayUserName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
-                Text(" 👋", style = MaterialTheme.typography.headlineSmall)
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Hi, ", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(displayUserName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+                    Text(" 👋", style = MaterialTheme.typography.headlineSmall)
+                }
+                if (district != null) {
+                    Text(
+                        text = "Connected to $district Civic Portal",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
             }
 
             Card(
@@ -144,7 +188,11 @@ fun UserDashboardScreen(
                     .padding(horizontal = 16.dp)
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
-                    .clickable { coroutineScope.launch { pagerState.animateScrollToPage(3) } },
+                    .clickable { 
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        selectedTab = 1 // Switch to Community Hub
+                        coroutineScope.launch { pagerState.animateScrollToPage(2) } // Switch to Resolved
+                    },
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 shape = RoundedCornerShape(20.dp)
@@ -161,7 +209,14 @@ fun UserDashboardScreen(
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("1,200 issues resolved", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        val resolvedCount = if (selectedTab == 1) state.communityResolvedCount else state.resolvedComplaints.size
+                        val label = if (selectedTab == 1) "community issues resolved" else "issues you resolved"
+                        Text(
+                            text = String.format("%,d %s", resolvedCount, label), 
+                            style = MaterialTheme.typography.titleSmall, 
+                            fontWeight = FontWeight.Bold, 
+                            color = MaterialTheme.colorScheme.primary
+                        )
                         Text("Your community is improving.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Icon(Icons.Default.ChevronRight, contentDescription = "Analytics", tint = MaterialTheme.colorScheme.primary.copy(alpha=0.4f))
@@ -260,12 +315,18 @@ fun UserDashboardScreen(
             ) {
                 Tab(
                     selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
+                    onClick = { 
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        selectedTab = 0 
+                    },
                     text = { Text("My Reports", style = MaterialTheme.typography.titleSmall, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium) }
                 )
                 Tab(
                     selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
+                    onClick = { 
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        selectedTab = 1 
+                    },
                     text = { Text("Community Hub", style = MaterialTheme.typography.titleSmall, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium) }
                 )
             }
@@ -348,11 +409,14 @@ fun UserDashboardScreen(
                         else -> emptyList()
                     }
                     
-                    // Logic to simulate "Community Hub" by mixing data or using global state
-                    // In a real app, you'd fetch all complaints for the hub.
                     val displayList = if (selectedTab == 0) list else {
-                        // Mocking some "Community" behavior for the hub tab
-                        list.map { it.copy(description = "[Community] ${it.description}") }
+                        // Community Hub: Filter by District
+                        list.filter { 
+                            district == null || 
+                            it.city.contains(district, ignoreCase = true) || 
+                            it.state.contains(district, ignoreCase = true) ||
+                            (district.contains(it.city, ignoreCase = true) && it.city.isNotBlank())
+                        }.map { it.copy(description = "[Community Hub] ${it.description}") }
                     }
 
                     val filteredList = if (searchQuery.isBlank()) {
@@ -363,11 +427,11 @@ fun UserDashboardScreen(
                             it.city.contains(searchQuery, ignoreCase = true) ||
                             it.description.contains(searchQuery, ignoreCase = true)
                         }
-                    }.let {
+                    }.let { unsorted ->
                         when (sortOption) {
-                            SortOption.DATE_DESC -> it.sortedByDescending { item -> item.createdAt }
-                            SortOption.DATE_ASC -> it.sortedBy { item -> item.createdAt }
-                            SortOption.RATING_DESC -> it.sortedByDescending { item -> item.rating }
+                            SortOption.DATE_DESC -> unsorted.sortedByDescending { it.createdAt }
+                            SortOption.DATE_ASC -> unsorted.sortedBy { it.createdAt }
+                            SortOption.RATING_DESC -> unsorted.sortedByDescending { it.rating }
                         }
                     }
 
@@ -428,14 +492,21 @@ fun UserDashboardScreen(
                                     Box(
                                         modifier = Modifier
                                             .padding(horizontal = 16.dp)
-                                            .animateItem()
                                     ) {
                                         ComplaintCard(
                                             complaint = complaint,
                                             isAdmin = false,
                                             onClick = { onNavigateToDetail(complaint.id) },
                                             onUpdateStatusClick = {},
-                                            showCommunityFeatures = selectedTab == 1
+                                            showCommunityFeatures = selectedTab == 1,
+                                            isSupported = state.supportedIds.contains(complaint.id),
+                                            onSupportClick = {
+                                                if (selectedTab == 1) {
+                                                    viewModel.supportComplaint(complaint.id) {
+                                                        viewModel.fetchUserComplaints()
+                                                    }
+                                                }
+                                            }
                                         )
                                     }
                                 }
