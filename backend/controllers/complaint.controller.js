@@ -343,6 +343,23 @@ export const updateComplaintStatus = async (req, res) => {
       { new: true }
     );
 
+    // Socket broadcasting logic
+    const io = req.app.get("io");
+    if (io) {
+      if (status === "resolved") {
+        // Notify everyone for global motivation
+        io.emit("globalToast", {
+          message: `Success! An issue in ${updateComplaint.city} has been resolved!`,
+          type: "success"
+        });
+      }
+      // Notify only room members for standard progress
+      io.to(complaintId).emit("statusUpdated", {
+        complaintId,
+        status: status.toUpperCase()
+      });
+    }
+
     res.status(201).json({
       success: true,
       message: "Complaint status updated",
@@ -412,6 +429,19 @@ export const updateAfterImageUrl = async (req, res) => {
     complaint.status = "resolved";
 
     await complaint.save();
+
+    // Socket broadcasting
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("globalToast", {
+        message: `Outstanding! A problem in ${complaint.city} was just resolved.`,
+        type: "success"
+      });
+      io.to(complaintId).emit("statusUpdated", {
+        complaintId,
+        status: "RESOLVED"
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -487,6 +517,21 @@ export const updateComplaint = async (req, res) => {
 
     // Save updates
     await complaint.save();
+
+    // Socket broadcasting
+    const io = req.app.get("io");
+    if (io) {
+      if (complaint.status === "resolved") {
+        io.emit("globalToast", {
+          message: `Great news! Issues in ${complaint.city} are being fixed.`,
+          type: "success"
+        });
+      }
+      io.to(complaintId).emit("statusUpdated", {
+        complaintId,
+        status: complaint.status.toUpperCase()
+      });
+    }
 
     // Send email after resolved
     if (complaint.status === "resolved") {
@@ -622,6 +667,33 @@ export const rateComplaint = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: `Error in rate complaint API: ${error.message}`,
+    });
+  }
+};
+
+// Get Public Complaint Stats (Total counts only)
+export const getPublicStats = async (req, res) => {
+  try {
+    const totalResolved = await Complaint.countDocuments({
+      status: "resolved",
+      ...ACTIVE_COMPLAINT_QUERY,
+    });
+    const totalActive = await Complaint.countDocuments({
+      status: { $in: ["new", "in progress"] },
+      ...ACTIVE_COMPLAINT_QUERY,
+    });
+
+    res.status(200).json({
+      success: true,
+      stats: {
+        totalResolved,
+        totalActive,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: `Error fetching public stats: ${error.message}`,
     });
   }
 };
@@ -1126,9 +1198,15 @@ export const supportComplaint = async (req, res) => {
     );
 
     if (alreadySupported) {
+      complaint.supporters = complaint.supporters.filter(
+        (id) => id.toString() !== req.user._id.toString()
+      );
+      complaint.supportCount = complaint.supporters.length;
+      await complaint.save();
+
       return res.status(200).json({
         success: true,
-        message: "Complaint already supported",
+        message: "Support removed",
         supportCount: complaint.supportCount,
       });
     }
@@ -1146,6 +1224,90 @@ export const supportComplaint = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: `Error supporting complaint: ${error.message}`,
+    });
+  }
+};
+
+// Get Public Feed (All users, local or global)
+export const getPublicFeed = async (req, res) => {
+  try {
+    const { district, page = 1, limit = 20 } = req.query;
+    const query = { ...ACTIVE_COMPLAINT_QUERY };
+
+    if (district && district !== "all") {
+      const safeDistrict = district.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const districtRegex = new RegExp(safeDistrict, "i");
+      query.$or = [
+        { city: districtRegex },
+        { state: districtRegex },
+        { landmark: districtRegex }
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const complaints = await Complaint.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate("user", "fullName profilePic");
+
+    const total = await Complaint.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      complaints,
+      pagination: {
+        total,
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: `Error fetching feed: ${error.message}`,
+    });
+  }
+};
+
+// Get Public Complaint Stats (Dynamic Local vs Global)
+export const getPublicStats = async (req, res) => {
+  try {
+    const { district } = req.query;
+    const query = { ...ACTIVE_COMPLAINT_QUERY };
+
+    if (district && district !== "all") {
+      const safeDistrict = district.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const districtRegex = new RegExp(safeDistrict, "i");
+      query.$or = [
+        { city: districtRegex },
+        { state: districtRegex }
+      ];
+    }
+
+    const totalResolved = await Complaint.countDocuments({
+      ...query,
+      status: "resolved",
+    });
+
+    const totalActive = await Complaint.countDocuments({
+      ...query,
+      status: { $in: ["new", "in progress"] },
+    });
+
+    res.status(200).json({
+      success: true,
+      stats: {
+        totalResolved,
+        totalActive,
+        scope: district && district !== "all" ? district : "Nationwide"
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: `Error fetching public stats: ${error.message}`,
     });
   }
 };

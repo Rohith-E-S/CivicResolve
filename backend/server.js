@@ -43,6 +43,9 @@ app.use("/api/auth", authRouter);
 app.use("/api/complaint", complaintRouter);
 app.use("/api/messages", messageRouter);
 
+// Set io to app to access in controllers
+app.set("io", io);
+
 // Socket.IO authentication middleware
 io.use(socketAuth);
 

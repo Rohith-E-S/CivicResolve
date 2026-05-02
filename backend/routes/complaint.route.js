@@ -19,6 +19,7 @@ import {
   getMyPaginatedComplaints,
   getComplaintsWithMessages,
   getMyComplaintsWithMessages,
+  getPublicStats,
 } from "../controllers/complaint.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/uploads.js";
@@ -30,6 +31,8 @@ complaintRouter.post("/create-complaint",protectRoute,upload.single("imageUrl"),
 complaintRouter.get("/get-complaints", protectRoute, getMyComplaint);
 
 complaintRouter.get("/get-all-complaints", protectRoute, getAllComplaints);
+
+complaintRouter.get("/public-stats", protectRoute, getPublicStats);
 
 complaintRouter.post("/update-complaint-status/:id",protectRoute,updateComplaintStatus,);
 

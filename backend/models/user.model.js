@@ -39,6 +39,11 @@ const userSchema = new mongoose.Schema(
       type: String,
     },
 
+    homeDistrict: {
+      type: String,
+      default: "",
+    },
+
     isAdmin: {
       type: Boolean,
       default: false,
