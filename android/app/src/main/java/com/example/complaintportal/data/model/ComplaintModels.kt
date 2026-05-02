@@ -85,7 +85,8 @@ data class AdminComplaintStatsResponse(
 @JsonClass(generateAdapter = true)
 data class PublicStats(
     val totalResolved: Int,
-    val totalActive: Int
+    val totalActive: Int,
+    val scope: String? = null
 )
 
 @JsonClass(generateAdapter = true)

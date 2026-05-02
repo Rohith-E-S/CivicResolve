@@ -17,10 +17,13 @@ data class ComplaintState(
     val newComplaints: List<Complaint> = emptyList(),
     val inProgressComplaints: List<Complaint> = emptyList(),
     val resolvedComplaints: List<Complaint> = emptyList(),
+    val communityComplaints: List<Complaint> = emptyList(),
     val currentComplaint: Complaint? = null,
     val error: String? = null,
     val supportedIds: Set<String> = emptySet(),
-    val communityResolvedCount: Int = 1200 // Default value
+    val communityResolvedCount: Int = 1200,
+    val statsScope: String = "Global",
+    val isCommunityLoading: Boolean = false
 )
 
 class ComplaintViewModel(private val repository: ComplaintRepository) : ViewModel() {
@@ -213,6 +216,7 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
                 newComplaints = updateList(currentState.newComplaints),
                 inProgressComplaints = updateList(currentState.inProgressComplaints),
                 resolvedComplaints = updateList(currentState.resolvedComplaints),
+                communityComplaints = updateList(currentState.communityComplaints),
                 currentComplaint = if (currentState.currentComplaint?.id == id) {
                     val currentCount = currentState.currentComplaint.supportCount ?: 0
                     currentState.currentComplaint.copy(supportCount = maxOf(0, currentCount + delta))
@@ -232,15 +236,42 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
         }
     }
 
-    fun fetchPublicStats() {
+    fun fetchPublicStats(district: String? = null) {
         viewModelScope.launch {
-            val result = repository.getPublicStats()
+            val result = repository.getPublicStats(district)
             result.onSuccess { response ->
                 if (response.success && response.stats != null) {
                     _state.value = _state.value.copy(
-                        communityResolvedCount = response.stats.totalResolved
+                        communityResolvedCount = response.stats.totalResolved,
+                        statsScope = response.stats.scope ?: (if (district == null) "Nationwide" else district)
                     )
                 }
+            }
+        }
+    }
+
+    fun fetchCommunityFeed(district: String? = null) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isCommunityLoading = true)
+            val result = repository.getPublicFeed(district)
+            result.onSuccess { response ->
+                if (response.success) {
+                    val complaints = response.complaints ?: emptyList()
+                    val supportedIds = _state.value.supportedIds
+                    
+                    val processed = complaints.map { 
+                        if (it.id in supportedIds && (it.supportCount ?: 0) == 0) it.copy(supportCount = 1) else it
+                    }
+
+                    _state.value = _state.value.copy(
+                        isCommunityLoading = false,
+                        communityComplaints = processed
+                    )
+                } else {
+                    _state.value = _state.value.copy(isCommunityLoading = false, error = response.message)
+                }
+            }.onFailure {
+                _state.value = _state.value.copy(isCommunityLoading = false, error = it.message)
             }
         }
     }

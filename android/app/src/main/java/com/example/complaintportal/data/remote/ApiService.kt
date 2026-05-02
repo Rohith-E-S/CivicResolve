@@ -92,8 +92,11 @@ interface ApiService {
     @GET("complaint/get-complaint-data/{id}")
     suspend fun getComplaint(@Path("id") id: String): Response<SingleComplaintResponse>
 
+    @GET("complaint/feed")
+    suspend fun getPublicFeed(@Query("district") district: String? = null): Response<ComplaintListResponse>
+
     @GET("complaint/public-stats")
-    suspend fun getPublicStats(): Response<PublicStatsResponse>
+    suspend fun getPublicStats(@Query("district") district: String? = null): Response<PublicStatsResponse>
 
     @POST("complaint/rate/{id}")
     suspend fun rateComplaint(

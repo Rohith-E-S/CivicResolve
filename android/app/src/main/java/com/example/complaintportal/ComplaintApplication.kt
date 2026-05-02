@@ -80,6 +80,17 @@ class ComplaintApplication : Application() {
                                         }
                                     }
                                 }
+
+                                globalSocket?.on("globalToast") { args ->
+                                    if (args.isNotEmpty()) {
+                                        try {
+                                            val json = JSONObject(args[0].toString())
+                                            val message = json.getString("message")
+                                            // Since we're not in an Activity, we'll show a system notification
+                                            notificationHelper.showNotification("CivicResolve Update", message)
+                                        } catch (e: Exception) { e.printStackTrace() }
+                                    }
+                                }
                                 globalSocket?.connect()
                             }
 

@@ -51,6 +51,7 @@ fun UserDashboardScreen(
     var sortOption by remember { mutableStateOf(SortOption.DATE_DESC) }
     var showSortMenu by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) } // 0: My Reports, 1: Community Hub
+    var communityTabScope by remember { mutableIntStateOf(0) } // 0: My District, 1: Global Feed
     
     val pagerState = rememberPagerState(pageCount = { 4 })
     val coroutineScope = rememberCoroutineScope()
@@ -59,18 +60,29 @@ fun UserDashboardScreen(
     val onRefresh = {
         isRefreshing = true
         viewModel.fetchUserComplaints()
-        viewModel.fetchPublicStats()
-    }
-
-    LaunchedEffect(state.isLoading) {
-        if (!state.isLoading) {
-            isRefreshing = false
+        if (selectedTab == 1) {
+            val scope = if (communityTabScope == 0) district else "all"
+            viewModel.fetchCommunityFeed(scope)
+            viewModel.fetchPublicStats(scope)
+        } else {
+            viewModel.fetchPublicStats()
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.fetchUserComplaints()
-        viewModel.fetchPublicStats()
+    LaunchedEffect(selectedTab, communityTabScope) {
+        if (selectedTab == 1) {
+            val scope = if (communityTabScope == 0) district else "all"
+            viewModel.fetchCommunityFeed(scope)
+            viewModel.fetchPublicStats(scope)
+        } else {
+            viewModel.fetchPublicStats()
+        }
+    }
+
+    LaunchedEffect(state.isLoading, state.isCommunityLoading) {
+        if (!state.isLoading && !state.isCommunityLoading) {
+            isRefreshing = false
+        }
     }
 
     Scaffold(
@@ -210,9 +222,12 @@ fun UserDashboardScreen(
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         val resolvedCount = if (selectedTab == 1) state.communityResolvedCount else state.resolvedComplaints.size
-                        val label = if (selectedTab == 1) "community issues resolved" else "issues you resolved"
+                        val scopeLabel = if (selectedTab == 1) {
+                            if (communityTabScope == 0 && district != null) "in ${district.split(" ").first()}" else "nationwide"
+                        } else "you resolved"
+                        
                         Text(
-                            text = String.format("%,d %s", resolvedCount, label), 
+                            text = String.format("%,d issues %s", resolvedCount, scopeLabel), 
                             style = MaterialTheme.typography.titleSmall, 
                             fontWeight = FontWeight.Bold, 
                             color = MaterialTheme.colorScheme.primary
@@ -410,104 +425,127 @@ fun UserDashboardScreen(
                     }
                     
                     val displayList = if (selectedTab == 0) list else {
-                        // Community Hub: Filter by District
-                        list.filter { 
-                            district == null || 
-                            it.city.contains(district, ignoreCase = true) || 
-                            it.state.contains(district, ignoreCase = true) ||
-                            (district.contains(it.city, ignoreCase = true) && it.city.isNotBlank())
-                        }.map { it.copy(description = "[Community Hub] ${it.description}") }
-                    }
-
-                    val filteredList = if (searchQuery.isBlank()) {
-                        displayList
-                    } else {
-                        displayList.filter {
-                            it.category.contains(searchQuery, ignoreCase = true) ||
-                            it.city.contains(searchQuery, ignoreCase = true) ||
-                            it.description.contains(searchQuery, ignoreCase = true)
-                        }
-                    }.let { unsorted ->
-                        when (sortOption) {
-                            SortOption.DATE_DESC -> unsorted.sortedByDescending { it.createdAt }
-                            SortOption.DATE_ASC -> unsorted.sortedBy { it.createdAt }
-                            SortOption.RATING_DESC -> unsorted.sortedByDescending { it.rating }
-                        }
+                        state.communityComplaints
                     }
 
                     @OptIn(ExperimentalMaterial3Api::class)
                     val pullToRefreshState = rememberPullToRefreshState()
-                    PullToRefreshBox(
-                        isRefreshing = isRefreshing,
-                        onRefresh = onRefresh,
-                        modifier = Modifier.fillMaxSize(),
-                        state = pullToRefreshState,
-                        indicator = {
-                            CustomPullToRefreshIndicator(
-                                isRefreshing = isRefreshing,
-                                state = pullToRefreshState,
-                                modifier = Modifier.align(Alignment.TopCenter)
-                            )
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        if (selectedTab == 1) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilterChip(
+                                    selected = communityTabScope == 0,
+                                    onClick = { communityTabScope = 0 },
+                                    label = { Text("My District") },
+                                    leadingIcon = if (communityTabScope == 0) {
+                                        { Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    } else null,
+                                    shape = CircleShape
+                                )
+                                FilterChip(
+                                    selected = communityTabScope == 1,
+                                    onClick = { communityTabScope = 1 },
+                                    label = { Text("Global Feed") },
+                                    leadingIcon = if (communityTabScope == 1) {
+                                        { Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    } else null,
+                                    shape = CircleShape
+                                )
+                            }
                         }
-                    ) {
-                        LazyColumn(
+
+                        PullToRefreshBox(
+                            isRefreshing = isRefreshing,
+                            onRefresh = onRefresh,
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            state = pullToRefreshState,
+                            indicator = {
+                                CustomPullToRefreshIndicator(
+                                    isRefreshing = isRefreshing,
+                                    state = pullToRefreshState,
+                                    modifier = Modifier.align(Alignment.TopCenter)
+                                )
+                            }
                         ) {
-                            if (filteredList.isEmpty() && !state.isLoading) {
-                                item {
-                                    Column(
-                                        modifier = Modifier.fillParentMaxSize().padding(32.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Box(
-                                            modifier = Modifier.size(120.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer.copy(alpha=0.2f)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
-                                        }
-                                        Spacer(modifier = Modifier.height(24.dp))
-                                        Text("No Complaints Found", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                        Text(
-                                            "Reporting a pothole or streetlight helps the community. Get started by reporting your first issue!", 
-                                            style = MaterialTheme.typography.bodyMedium, 
-                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(top = 8.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(24.dp))
-                                        Button(
-                                            onClick = onNavigateToCreate,
-                                            shape = RoundedCornerShape(12.dp)
-                                        ) {
-                                            Text("Report an Issue")
-                                        }
-                                    }
+                            val filteredList = if (searchQuery.isBlank()) {
+                                displayList
+                            } else {
+                                displayList.filter {
+                                    it.category.contains(searchQuery, ignoreCase = true) ||
+                                    it.city.contains(searchQuery, ignoreCase = true) ||
+                                    it.description.contains(searchQuery, ignoreCase = true)
+                                }
+                            }.let { unsorted ->
+                                when (sortOption) {
+                                    SortOption.DATE_DESC -> unsorted.sortedByDescending { it.createdAt }
+                                    SortOption.DATE_ASC -> unsorted.sortedBy { it.createdAt }
+                                    SortOption.RATING_DESC -> unsorted.sortedByDescending { it.rating }
                                 }
                             }
- else {
-                                itemsIndexed(items = filteredList, key = { _, item -> item.id }) { _, complaint ->
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(horizontal = 16.dp)
-                                    ) {
-                                        ComplaintCard(
-                                            complaint = complaint,
-                                            isAdmin = false,
-                                            onClick = { onNavigateToDetail(complaint.id) },
-                                            onUpdateStatusClick = {},
-                                            showCommunityFeatures = selectedTab == 1,
-                                            isSupported = state.supportedIds.contains(complaint.id),
-                                            onSupportClick = {
-                                                if (selectedTab == 1) {
-                                                    viewModel.supportComplaint(complaint.id) {
-                                                        viewModel.fetchUserComplaints()
+
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(bottom = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                if (filteredList.isEmpty() && !state.isLoading && !state.isCommunityLoading) {
+                                    item {
+                                        Column(
+                                            modifier = Modifier.fillParentMaxSize().padding(32.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Box(
+                                                modifier = Modifier.size(120.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer.copy(alpha=0.2f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                            Spacer(modifier = Modifier.height(24.dp))
+                                            Text("No Complaints Found", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                "Reporting a pothole or streetlight helps the community. Get started by reporting your first issue!", 
+                                                style = MaterialTheme.typography.bodyMedium, 
+                                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(top = 8.dp)
+                                            )
+                                            Spacer(modifier = Modifier.height(24.dp))
+                                            Button(
+                                                onClick = onNavigateToCreate,
+                                                shape = RoundedCornerShape(12.dp)
+                                            ) {
+                                                Text("Report an Issue")
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    itemsIndexed(items = filteredList, key = { _, item -> item.id }) { _, complaint ->
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(horizontal = 16.dp)
+                                        ) {
+                                            ComplaintCard(
+                                                complaint = complaint,
+                                                isAdmin = false,
+                                                onClick = { onNavigateToDetail(complaint.id) },
+                                                onUpdateStatusClick = {},
+                                                showCommunityFeatures = selectedTab == 1,
+                                                isSupported = state.supportedIds.contains(complaint.id),
+                                                onSupportClick = {
+                                                    if (selectedTab == 1) {
+                                                        viewModel.supportComplaint(complaint.id) {
+                                                            // Optional: refresh specific lists or just rely on state sync
+                                                        }
                                                     }
                                                 }
-                                            }
-                                        )
+                                            )
+                                        }
                                     }
                                 }
                             }

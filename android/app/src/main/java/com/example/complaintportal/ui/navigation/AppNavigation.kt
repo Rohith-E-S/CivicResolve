@@ -41,7 +41,6 @@ sealed class Screen(val route: String) {
     object ForgotPassword : Screen("forgot_password")
     object Dashboard : Screen("dashboard")
     object Profile : Screen("profile")
-    object Onboarding : Screen("onboarding")
     object CreateComplaint : Screen("create_complaint")
     object ComplaintDetail : Screen("complaint_detail/{complaintId}") {
         fun createRoute(complaintId: String) = "complaint_detail/$complaintId"
@@ -155,13 +154,7 @@ fun AppNavigation(
 
             composable(Screen.Dashboard.route) {
                 CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
-                    if (authState.isAuthenticated && !authState.isOnboardingComplete) {
-                        LaunchedEffect(Unit) {
-                            navController.navigate(Screen.Onboarding.route) {
-                                popUpTo(Screen.Dashboard.route) { inclusive = true }
-                            }
-                        }
-                    } else if (authState.isAuthenticated) {
+                    if (authState.isAuthenticated) {
                         if (authState.user?.isAdmin == true) {
                             AdminDashboardScreen(
                                 viewModel = complaintViewModel,
@@ -196,17 +189,6 @@ fun AppNavigation(
                 ProfileScreen(
                     viewModel = authViewModel,
                     onNavigateBack = { navController.popBackStack() }
-                )
-            }
-
-            composable(Screen.Onboarding.route) {
-                LocationOnboardingScreen(
-                    viewModel = authViewModel,
-                    onOnboardingComplete = {
-                        navController.navigate(Screen.Dashboard.route) {
-                            popUpTo(Screen.Onboarding.route) { inclusive = true }
-                        }
-                    }
                 )
             }
 
