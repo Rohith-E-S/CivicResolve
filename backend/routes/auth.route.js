@@ -11,6 +11,7 @@ import {
    verifyPasswordResetOtp,
    sendPasswordResetOtp,
    resetPassword,
+   updateHomeDistrict,
 } from "../controllers/user.controller.js";
 
 import { protectRoute } from "../middleware/auth.middleware.js";
@@ -46,5 +47,7 @@ authRouter.post("/sendPasswordResetOtp", sendPasswordResetOtp);
 authRouter.post("/verifyPasswordResetOtp", verifyPasswordResetOtp);
 
 authRouter.post("/reset-password", resetPassword);
+
+authRouter.post("/update-home-district", protectRoute, updateHomeDistrict);
 
 export default authRouter;
