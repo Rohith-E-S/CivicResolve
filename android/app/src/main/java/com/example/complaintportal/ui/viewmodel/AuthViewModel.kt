@@ -91,7 +91,7 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
                         isChecking = false,
                         isAuthenticated = true,
                         user = response.user,
-                        isOnboardingComplete = true,
+                        isOnboardingComplete = !response.user.homeDistrict.isNullOrBlank(),
                         detectedDistrict = response.user.homeDistrict
                     )
                 } else {
@@ -119,7 +119,7 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
                         isLoading = false,
                         isAuthenticated = true,
                         user = response.user,
-                        isOnboardingComplete = true,
+                        isOnboardingComplete = !response.user?.homeDistrict.isNullOrBlank(),
                         detectedDistrict = response.user?.homeDistrict
                     )
                     onSuccess()
@@ -148,7 +148,7 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
                         isLoading = false,
                         isAuthenticated = true,
                         user = response.user,
-                        isOnboardingComplete = true,
+                        isOnboardingComplete = !response.user?.homeDistrict.isNullOrBlank(),
                         detectedDistrict = response.user?.homeDistrict
                     )
                     onSuccess()
@@ -177,7 +177,7 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
                         isLoading = false,
                         isAuthenticated = true,
                         user = response.user,
-                        isOnboardingComplete = true,
+                        isOnboardingComplete = !response.user?.homeDistrict.isNullOrBlank(),
                         detectedDistrict = response.user?.homeDistrict
                     )
                     onSuccess()

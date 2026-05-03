@@ -33,12 +33,14 @@ val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { nu
 val LocalNavAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 
 sealed class Screen(val route: String) {
+    object Splash : Screen("splash")
     object Login : Screen("login")
     object Signup : Screen("signup")
     object OtpVerify : Screen("otp_verify/{email}") {
         fun createRoute(email: String) = "otp_verify/$email"
     }
     object ForgotPassword : Screen("forgot_password")
+    object LocationOnboarding : Screen("location_onboarding")
     object Dashboard : Screen("dashboard")
     object Profile : Screen("profile")
     object CreateComplaint : Screen("create_complaint")
@@ -73,35 +75,41 @@ fun AppNavigation(
 
     val authState by authViewModel.authState.collectAsState()
 
-    if (authState.isChecking) {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        }
-    } else {
-        SharedTransitionLayout {
+    SharedTransitionLayout {
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides this
             ) {
                 NavHost(
                     navController = navController,
-                    startDestination = if (authState.isAuthenticated) Screen.Dashboard.route else Screen.Login.route,
+                    startDestination = Screen.Splash.route,
                     enterTransition = { slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(300)) + fadeIn(animationSpec = tween(300)) },
                     exitTransition = { slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(300)) + fadeOut(animationSpec = tween(300)) },
                     popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) + fadeIn(animationSpec = tween(300)) },
                     popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(300)) + fadeOut(animationSpec = tween(300)) }
                 ) {
+                    composable(Screen.Splash.route) {
+                        SplashScreen(onFinished = {
+                            val destination = when {
+                                !authState.isAuthenticated -> Screen.Login.route
+                                authState.detectedDistrict.isNullOrBlank() -> Screen.LocationOnboarding.route
+                                else -> Screen.Dashboard.route
+                            }
+                            navController.navigate(destination) {
+                                popUpTo(Screen.Splash.route) { inclusive = true }
+                            }
+                        })
+                    }
             composable(Screen.Login.route) {
                 LoginScreen(
                     viewModel = authViewModel,
                     onNavigateToSignup = { navController.navigate(Screen.Signup.route) },
                     onNavigateToForgotPassword = { navController.navigate(Screen.ForgotPassword.route) },
                     onLoginSuccess = {
-                        navController.navigate(Screen.Dashboard.route) {
+                        val dest = if (authState.detectedDistrict.isNullOrBlank())
+                            Screen.LocationOnboarding.route
+                        else
+                            Screen.Dashboard.route
+                        navController.navigate(dest) {
                             popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     }
@@ -128,7 +136,8 @@ fun AppNavigation(
                         navController.navigate(Screen.OtpVerify.createRoute(email))
                     },
                     onSignupSuccess = {
-                        navController.navigate(Screen.Dashboard.route) {
+                        // New accounts never have a district — always go to onboarding
+                        navController.navigate(Screen.LocationOnboarding.route) {
                             popUpTo(Screen.Signup.route) { inclusive = true }
                         }
                     }
@@ -145,8 +154,19 @@ fun AppNavigation(
                     email = email,
                     onNavigateBack = { navController.popBackStack() },
                     onVerifySuccess = {
-                        navController.navigate(Screen.Dashboard.route) {
+                        navController.navigate(Screen.LocationOnboarding.route) {
                             popUpTo(Screen.Signup.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.LocationOnboarding.route) {
+                LocationOnboardingScreen(
+                    viewModel = authViewModel,
+                    onOnboardingComplete = {
+                        navController.navigate(Screen.Dashboard.route) {
+                            popUpTo(Screen.LocationOnboarding.route) { inclusive = true }
                         }
                     }
                 )
@@ -245,8 +265,7 @@ fun AppNavigation(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
+                }
+            }
         }
     }
-}
-}
-}

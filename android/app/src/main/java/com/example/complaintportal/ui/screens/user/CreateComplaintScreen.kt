@@ -50,6 +50,7 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.airbnb.lottie.compose.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -166,13 +167,24 @@ fun CreateComplaintScreen(
                     val addresses = geocoder.getFromLocation(lat.toDouble(), lng.toDouble(), 1)
                     if (!addresses.isNullOrEmpty()) {
                         val address = addresses[0]
-                        city = address.locality ?: address.subAdminArea ?: address.adminArea ?: ""
-                        userState = address.adminArea ?: ""
-                        val extractedLandmark = address.featureName ?: address.thoroughfare ?: address.subLocality ?: ""
-                        if (extractedLandmark != city && extractedLandmark != userState) {
-                            landmark = extractedLandmark
+                        val detectedDistrict = address.subAdminArea ?: address.locality ?: address.adminArea ?: ""
+                        val detectedCity = address.locality ?: address.subAdminArea ?: ""
+                        val detectedState = address.adminArea ?: ""
+                        
+                        withContext(Dispatchers.Main) {
+                            city = detectedCity
+                            userState = detectedState
+                            val extractedLandmark = address.featureName ?: address.thoroughfare ?: address.subLocality ?: ""
+                            if (extractedLandmark != detectedCity && extractedLandmark != detectedState) {
+                                landmark = extractedLandmark
+                            }
+                            locationMessage = "Location updated."
+                            
+                            // NEW: Automatically save home district if it's currently null
+                            if (authState.detectedDistrict.isNullOrBlank() && detectedDistrict.isNotBlank()) {
+                                authViewModel.completeOnboarding(detectedDistrict) { /* Silently updated */ }
+                            }
                         }
-                        locationMessage = "Location updated."
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()

@@ -47,7 +47,6 @@ fun UserDashboardScreen(
     val state by viewModel.state.collectAsState()
     val displayUserName = if (userName.isBlank() || userName == "User") "Himanshu Singh" else userName
     var searchQuery by remember { mutableStateOf("") }
-    var isRefreshing by remember { mutableStateOf(false) }
     var sortOption by remember { mutableStateOf(SortOption.DATE_DESC) }
     var showSortMenu by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) } // 0: My Reports, 1: Community Hub
@@ -58,32 +57,27 @@ fun UserDashboardScreen(
     val haptic = LocalHapticFeedback.current
 
     val onRefresh = {
-        isRefreshing = true
-        viewModel.fetchUserComplaints()
         if (selectedTab == 1) {
-            val scope = if (communityTabScope == 0) district else "all"
+            val scope = if (communityTabScope == 0) (district ?: "all") else "all"
             viewModel.fetchCommunityFeed(scope)
             viewModel.fetchPublicStats(scope)
         } else {
+            viewModel.fetchUserComplaints()
             viewModel.fetchPublicStats()
         }
     }
 
     LaunchedEffect(selectedTab, communityTabScope) {
         if (selectedTab == 1) {
-            val scope = if (communityTabScope == 0) district else "all"
+            val scope = if (communityTabScope == 0) (district ?: "all") else "all"
             viewModel.fetchCommunityFeed(scope)
             viewModel.fetchPublicStats(scope)
         } else {
+            viewModel.fetchUserComplaints() // Added this
             viewModel.fetchPublicStats()
         }
     }
 
-    LaunchedEffect(state.isLoading, state.isCommunityLoading) {
-        if (!state.isLoading && !state.isCommunityLoading) {
-            isRefreshing = false
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -453,7 +447,7 @@ fun UserDashboardScreen(
                                 FilterChip(
                                     selected = communityTabScope == 0,
                                     onClick = { communityTabScope = 0 },
-                                    label = { Text("My District") },
+                                    label = { Text(if (district != null) "My District" else "My District (not set)") },
                                     leadingIcon = if (communityTabScope == 0) {
                                         { Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp)) }
                                     } else null,
@@ -472,13 +466,13 @@ fun UserDashboardScreen(
                         }
 
                         PullToRefreshBox(
-                            isRefreshing = isRefreshing,
+                            isRefreshing = state.isLoading || state.isCommunityLoading,
                             onRefresh = onRefresh,
                             modifier = Modifier.fillMaxSize(),
                             state = pullToRefreshState,
                             indicator = {
                                 CustomPullToRefreshIndicator(
-                                    isRefreshing = isRefreshing,
+                                    isRefreshing = state.isLoading || state.isCommunityLoading,
                                     state = pullToRefreshState,
                                     modifier = Modifier.align(Alignment.TopCenter)
                                 )

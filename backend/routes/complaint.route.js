@@ -20,6 +20,7 @@ import {
   getComplaintsWithMessages,
   getMyComplaintsWithMessages,
   getPublicStats,
+  getPublicFeed,
 } from "../controllers/complaint.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/uploads.js";
@@ -33,6 +34,7 @@ complaintRouter.get("/get-complaints", protectRoute, getMyComplaint);
 complaintRouter.get("/get-all-complaints", protectRoute, getAllComplaints);
 
 complaintRouter.get("/public-stats", protectRoute, getPublicStats);
+complaintRouter.get("/feed", protectRoute, getPublicFeed);
 
 complaintRouter.post("/update-complaint-status/:id",protectRoute,updateComplaintStatus,);
 
@@ -61,6 +63,6 @@ complaintRouter.get("/my-list", protectRoute, getMyPaginatedComplaints);
 complaintRouter.get("/nearby", protectRoute, getNearbyComplaints);
 complaintRouter.patch("/:id", protectRoute, updateMyComplaint);
 complaintRouter.delete("/:id", protectRoute, deleteMyComplaint);
-complaintRouter.post("/:id/support", protectRoute, supportComplaint);
+complaintRouter.post("/support/:id", protectRoute, supportComplaint);
 
 export default complaintRouter;

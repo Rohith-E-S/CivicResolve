@@ -169,6 +169,19 @@ fun LocationOnboardingScreen(
                                         modifier = Modifier.padding(top = 8.dp)
                                     )
                                 }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                TextButton(
+                                    onClick = { onOnboardingComplete() },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        "Skip for now",
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
                     } else {
