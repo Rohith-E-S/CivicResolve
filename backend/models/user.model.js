@@ -67,10 +67,6 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
-    homeDistrict: {
-      type: String,
-      default: null,
-    },
   },
   { timestamps: true }
 );
