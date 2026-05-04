@@ -666,6 +666,9 @@ fun ForgotPasswordScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+
     AuthBackground(imageUrl = "https://images.unsplash.com/photo-1501785888041-af3ef285b470") {
         // FIXED HEADER (Simulated with title change)
         FixedHeaderContent(title = "Reset Password")
@@ -674,21 +677,11 @@ fun ForgotPasswordScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
+                .imePadding()
         ) {
-            Row(
-                modifier = Modifier
-                    .padding(top = 48.dp, start = 16.dp, end = 16.dp)
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                }
-            }
-
             Spacer(modifier = Modifier.height(200.dp))
 
-            AuthContainer {
+            AuthContainer(modifier = Modifier.heightIn(min = screenHeight)) {
                 when (currentStep) {
                     ForgotPasswordStep.ENTER_EMAIL -> {
                         Text(
@@ -822,6 +815,9 @@ fun OtpVerifyScreen(
     var otp by remember { mutableStateOf("") }
     val scrollState = rememberScrollState()
 
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+
     AuthBackground(imageUrl = "https://images.unsplash.com/photo-1501785888041-af3ef285b470") {
         // FIXED HEADER
         FixedHeaderContent(title = "Verify Account")
@@ -830,6 +826,7 @@ fun OtpVerifyScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
+                .imePadding()
         ) {
             Row(
                 modifier = Modifier
@@ -844,7 +841,7 @@ fun OtpVerifyScreen(
 
             Spacer(modifier = Modifier.height(200.dp))
 
-            AuthContainer {
+            AuthContainer(modifier = Modifier.heightIn(min = screenHeight)) {
                 Icon(
                     imageVector = Icons.Rounded.VerifiedUser,
                     contentDescription = null,
