@@ -126,23 +126,29 @@ fun AppNavigation(
                     popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(300)) + fadeOut(animationSpec = tween(300)) }
                 ) {
                     composable(Screen.Splash.route) {
-                        SplashScreen(onFinished = {
-                            val destination = when {
-                                !authState.isAuthenticated -> Screen.Login.route
-                                authState.detectedDistrict.isNullOrBlank() -> Screen.LocationOnboarding.route
-                                else -> Screen.Dashboard.route
+                        // Wait for checkAuth() to finish before navigating away from splash.
+                        // This prevents the race condition where the splash ends before the
+                        // auth network call returns, causing a premature redirect to Login.
+                        LaunchedEffect(authState.isChecking) {
+                            if (!authState.isChecking) {
+                                val destination = when {
+                                    !authState.isAuthenticated -> Screen.Login.route
+                                    authState.detectedDistrict.isNullOrBlank() -> Screen.LocationOnboarding.route
+                                    else -> Screen.Dashboard.route
+                                }
+                                navController.navigate(destination) {
+                                    popUpTo(Screen.Splash.route) { inclusive = true }
+                                }
                             }
-                            navController.navigate(destination) {
-                                popUpTo(Screen.Splash.route) { inclusive = true }
-                            }
-                        })
+                        }
+                        SplashScreen()
                     }
             composable(Screen.Login.route) {
-                LoginScreen(
-                    viewModel = authViewModel,
-                    onNavigateToSignup = { navController.navigate(Screen.Signup.route) },
-                    onNavigateToForgotPassword = { navController.navigate(Screen.ForgotPassword.route) },
-                    onLoginSuccess = {
+                // React to authState changes instead of reading state inside the lambda.
+                // The login() call updates authState.isAuthenticated + detectedDistrict
+                // atomically; by the time this LaunchedEffect fires, both values are fresh.
+                LaunchedEffect(authState.isAuthenticated) {
+                    if (authState.isAuthenticated && !authState.isChecking) {
                         val dest = if (authState.detectedDistrict.isNullOrBlank())
                             Screen.LocationOnboarding.route
                         else
@@ -151,6 +157,12 @@ fun AppNavigation(
                             popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     }
+                }
+                LoginScreen(
+                    viewModel = authViewModel,
+                    onNavigateToSignup = { navController.navigate(Screen.Signup.route) },
+                    onNavigateToForgotPassword = { navController.navigate(Screen.ForgotPassword.route) },
+                    onLoginSuccess = { /* navigation is handled by LaunchedEffect above */ }
                 )
             }
 
