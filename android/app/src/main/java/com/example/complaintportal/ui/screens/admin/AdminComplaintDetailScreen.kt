@@ -218,6 +218,7 @@ fun AdminComplaintDetailScreen(
                                 PriorityUpvoteButton(
                                     supportCount = complaint.supportCount ?: 0,
                                     isSupported = state.supportedIds.contains(complaint.id),
+                                    enabled = false, // Admins cannot upvote
                                     onSupportClick = {
                                         viewModel.supportComplaint(complaint.id) {
                                             viewModel.fetchComplaint(complaint.id, userId)

@@ -1,33 +1,30 @@
 package com.example.complaintportal.ui.screens
 
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+import java.text.SimpleDateFormat
+import java.util.*
+import java.util.concurrent.TimeUnit
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshState
+import androidx.compose.material3.pulltorefresh.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.*
+import androidx.compose.ui.draw.*
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.layout.*
+import androidx.compose.ui.text.*
+import androidx.compose.ui.text.font.*
+import androidx.compose.ui.text.style.*
+import androidx.compose.ui.unit.*
 import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.launch
 import com.example.complaintportal.data.model.Complaint
@@ -41,6 +38,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.complaintportal.R
+
 
 @Composable
 fun Modifier.shimmerEffect(): Modifier {
@@ -250,8 +248,8 @@ fun ComplaintCard(
                                 Icon(
                                     imageVector = Icons.Default.LocationOn,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.outline,
-                                    modifier = Modifier.size(12.dp)
+                                    tint = MaterialTheme.colorScheme.primary, // Teal/Primary accent
+                                    modifier = Modifier.size(14.dp) // Slightly larger
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
@@ -266,28 +264,46 @@ fun ComplaintCard(
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier
-                                        .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha=0.2f), RoundedCornerShape(6.dp))
+                                        .background(androidx.compose.ui.graphics.Color(0xFFFFEBEE), RoundedCornerShape(6.dp)) // Light pink background
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
-                                    Text(
-                                        text = "📍",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp)
+                                    Icon(
+                                        imageVector = Icons.Default.LocationOn,
+                                        contentDescription = null,
+                                        tint = androidx.compose.ui.graphics.Color(0xFFE57373), // Reddish icon
+                                        modifier = Modifier.size(10.dp)
                                     )
                                     Spacer(modifier = Modifier.width(2.dp))
                                     Text(
                                         text = "${(100..900).random()}m away",
                                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                                         fontWeight = FontWeight.ExtraBold,
-                                        color = MaterialTheme.colorScheme.tertiary
+                                        color = androidx.compose.ui.graphics.Color(0xFFE57373) // Reddish text
                                     )
                                 }
                             }
                         }
                         
-                        val dateString = try {
-                            complaint.createdAt?.substring(0, 10) ?: "Just now"
-                        } catch (e: Exception) {
-                            "Just now"
+                        val dateDisplay = remember(complaint.createdAt) {
+                            try {
+                                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                                val createdDate = sdf.parse(complaint.createdAt!!)
+                                val now = Date()
+                                val diffInMillis = now.time - createdDate!!.time
+                                val diffInDays = TimeUnit.MILLISECONDS.toDays(diffInMillis)
+                                val diffInHours = TimeUnit.MILLISECONDS.toHours(diffInMillis)
+                                val diffInMinutes = TimeUnit.MILLISECONDS.toMinutes(diffInMillis)
+
+                                when {
+                                    diffInDays > 7 -> SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(createdDate)
+                                    diffInDays >= 1 -> "$diffInDays days ago"
+                                    diffInHours >= 1 -> "$diffInHours hours ago"
+                                    diffInMinutes >= 1 -> "$diffInMinutes mins ago"
+                                    else -> "Just now"
+                                }
+                            } catch (e: Exception) {
+                                complaint.createdAt?.substring(0, 10) ?: "Just now"
+                            }
                         }
 
                         Row(
@@ -296,9 +312,9 @@ fun ComplaintCard(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = dateString,
+                                text = dateDisplay,
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                fontWeight = FontWeight.Medium,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -521,4 +537,112 @@ fun ZoomableImageDialog(imageUrl: String, onDismiss: () -> Unit) {
             }
         }
     }
+}
+// ── Priority Logic ────────────────────────────────────────────────────────────
+enum class Priority { HIGH, MEDIUM, LOW }
+
+/**
+ * Determines priority based on upvote count and complaint age.
+ */
+fun calculatePriority(upvotes: Int, createdAtIso: String?): Priority {
+    if (createdAtIso == null) return Priority.LOW
+    val ageInDays = try {
+        ChronoUnit.DAYS.between(Instant.parse(createdAtIso), Instant.now())
+    } catch (_: Exception) { 0L }
+
+    return when {
+        upvotes >= 5 || ageInDays >= 7 -> Priority.HIGH
+        upvotes >= 2 || ageInDays >= 3 -> Priority.MEDIUM
+        else                            -> Priority.LOW
+    }
+}
+
+@Composable
+fun PriorityBadge(priority: Priority, modifier: Modifier = Modifier) {
+    val (bg, textColor, label, icon) = when (priority) {
+        Priority.HIGH   -> listOf(Color(0xFFFFEBEE), Color(0xFFD32F2F), "HIGH", "🔴")
+        Priority.MEDIUM -> listOf(Color(0xFFFFF3E0), Color(0xFFE65100), "MEDIUM", "🟡")
+        Priority.LOW    -> listOf(Color(0xFFE8F5E9), Color(0xFF2E7D32), "LOW", "🟢")
+        else -> listOf(Color.Gray, Color.White, "UNKNOWN", "⚪")
+    }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(bg as Color)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(icon as String, fontSize = 8.sp)
+            Text(
+                text       = label as String,
+                fontSize   = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color      = textColor as Color,
+                letterSpacing = 0.3.sp,
+            )
+        }
+    }
+}
+
+@Composable
+fun AdminStatsBar(
+    totalCount:    Int,
+    newCount:      Int,
+    activeCount:   Int,
+    resolvedCount: Int,
+    modifier:      Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment     = Alignment.CenterVertically,
+    ) {
+        StatCell(value = totalCount,    label = "Total",    color = Color(0xFF1A3A6E))
+        StatBarDivider()
+        StatCell(value = newCount,      label = "New",      color = Color(0xFFE53935))
+        StatBarDivider()
+        StatCell(value = activeCount,   label = "Active",   color = Color(0xFFE67E22))
+        StatBarDivider()
+        StatCell(value = resolvedCount, label = "Resolved", color = Color(0xFF1D9E75))
+    }
+}
+
+@Composable
+private fun StatCell(value: Int, label: String, color: Color) {
+    val animatedValue by animateIntAsState(
+        targetValue   = value,
+        animationSpec = tween(durationMillis = 700, easing = EaseOutCubic),
+        label         = "stat_$label",
+    )
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text       = animatedValue.toString(),
+            fontSize   = 22.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color      = color,
+        )
+        Text(
+            text     = label,
+            fontSize = 10.sp,
+            color    = Color(0xFF6A7F9A),
+        )
+    }
+}
+
+@Composable
+private fun StatBarDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(24.dp)
+            .background(Color(0xFFE8EDF5))
+    )
 }

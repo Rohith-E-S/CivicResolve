@@ -264,10 +264,26 @@ fun AppNavigation(
             }
 
             composable(Screen.Profile.route) {
-                ProfileScreen(
-                    viewModel = authViewModel,
-                    onNavigateBack = { navController.popBackStack() }
-                )
+                val authState by authViewModel.authState.collectAsState()
+                if (authState.user?.isAdmin == true) {
+                    AdminProfileScreen(
+                        authViewModel = authViewModel,
+                        complaintViewModel = complaintViewModel,
+                        onBack = { navController.popBackStack() },
+                        onManageUsers = { /* TODO */ },
+                        onViewAllComplaints = { navController.navigate(Screen.Dashboard.route) },
+                        onExportReports = { /* TODO */ },
+                        onBroadcastMessage = { /* TODO */ },
+                        onChangePassword = { /* TODO */ },
+                        onActivityLog = { /* TODO */ }
+                    )
+                } else {
+                    ProfileScreen(
+                        authViewModel = authViewModel,
+                        complaintViewModel = complaintViewModel,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
             }
 
             composable(Screen.CreateComplaint.route) {

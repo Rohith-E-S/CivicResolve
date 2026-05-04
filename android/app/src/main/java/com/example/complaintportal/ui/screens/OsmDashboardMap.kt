@@ -141,7 +141,10 @@ fun OsmDashboardMap(
                 mv.overlays.clear()
                 
                 val validComplaints = complaints.filter { 
-                    it.latitude.toDoubleOrNull() != null && it.longitude.toDoubleOrNull() != null 
+                    val lat = it.latitude.toDoubleOrNull()
+                    val lng = it.longitude.toDoubleOrNull()
+                    lat != null && lng != null && 
+                    lat in 6.0..38.0 && lng in 68.0..98.0
                 }
 
                 validComplaints.forEach { complaint ->

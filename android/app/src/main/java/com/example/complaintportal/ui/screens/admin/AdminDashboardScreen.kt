@@ -16,6 +16,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -67,7 +68,30 @@ fun AdminDashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("CivicResolve Admin", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primaryContainer) },
+                title = { 
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "CivicResolve", 
+                            fontWeight = FontWeight.ExtraBold, 
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            color = androidx.compose.ui.graphics.Color(0xFFF4A700).copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            Text(
+                                text = "ADMIN",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = androidx.compose.ui.graphics.Color(0xFFF4A700)
+                            )
+                        }
+                    }
+                },
                 actions = {
                     Box(
                         modifier = Modifier
@@ -75,6 +99,7 @@ fun AdminDashboardScreen(
                             .size(40.dp)
                             .clip(CircleShape)
                             .background(androidx.compose.ui.graphics.Color(0xFF1A3A6E))
+                            .border(2.dp, androidx.compose.ui.graphics.Color(0xFFF4A700), CircleShape) // Admin gold border
                             .clickable { onNavigateToDetail("profile") },
                         contentAlignment = Alignment.Center
                     ) {
@@ -91,128 +116,136 @@ fun AdminDashboardScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("Admin Console,", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Overview", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                }
-
-                BasicTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .background(MaterialTheme.colorScheme.surface, CircleShape)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), CircleShape),
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    decorationBox = { innerTextField ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Box(modifier = Modifier.weight(1f)) {
-                                if (searchQuery.isEmpty()) {
-                                    Text(
-                                        text = "Search...",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                innerTextField()
-                            }
-                        }
-                    }
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Text("Admin Console", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                AdminStatsBar(
+                    totalCount    = (state.newComplaints + state.inProgressComplaints + state.resolvedComplaints).size,
+                    newCount      = state.newComplaints.size,
+                    activeCount   = state.inProgressComplaints.size,
+                    resolvedCount = state.resolvedComplaints.size,
                 )
 
-                Box {
-                    IconButton(onClick = { showSortMenu = true }) {
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    BasicTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(24.dp)),
+                        singleLine = true,
+                        decorationBox = { innerTextField ->
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Box(modifier = Modifier.weight(1f)) {
+                                    if (searchQuery.isEmpty()) {
+                                        Text("Search...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                                    }
+                                    innerTextField()
+                                }
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(20.dp)) {
+                                        Icon(Icons.Default.Close, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+                                    }
+                                }
+                            }
+                        }
+                    )
+
+                    IconButton(
+                        onClick = { showSortMenu = true },
+                        modifier = Modifier
+                            .size(46.dp)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Sort,
                             contentDescription = "Sort",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
                         )
+                        DropdownMenu(
+                            expanded = showSortMenu,
+                            onDismissRequest = { showSortMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Newest First") },
+                                onClick = { sortOption = SortOption.DATE_DESC; showSortMenu = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Oldest First") },
+                                onClick = { sortOption = SortOption.DATE_ASC; showSortMenu = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Highest Rated") },
+                                onClick = { sortOption = SortOption.RATING_DESC; showSortMenu = false }
+                            )
+                        }
                     }
-                    DropdownMenu(
-                        expanded = showSortMenu,
-                        onDismissRequest = { showSortMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Newest First") },
-                            onClick = { sortOption = SortOption.DATE_DESC; showSortMenu = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Oldest First") },
-                            onClick = { sortOption = SortOption.DATE_ASC; showSortMenu = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Highest Rated") },
-                            onClick = { sortOption = SortOption.RATING_DESC; showSortMenu = false }
-                        )
-                    }
-                }
 
-                IconButton(
-                    onClick = { isMapView = !isMapView },
-                    modifier = Modifier
-                        .size(46.dp)
-                        .background(
-                            if (isMapView) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                            CircleShape
+                    IconButton(
+                        onClick = { isMapView = !isMapView },
+                        modifier = Modifier
+                            .size(46.dp)
+                            .background(
+                                if (isMapView) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = if (isMapView) Icons.Default.FormatListBulleted else Icons.Default.Map,
+                            contentDescription = if (isMapView) "Switch to List" else "Switch to Map",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
                         )
-                ) {
-                    Icon(
-                        imageVector = if (isMapView) Icons.Default.FormatListBulleted else Icons.Default.Map,
-                        contentDescription = if (isMapView) "Switch to List" else "Switch to Map",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    }
                 }
             }
 
+            // Filtering row
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 16.dp, top = 8.dp)
             ) {
                 item {
                     StatCard(
-                        title = "New Actions",
+                        title = "New",
                         count = state.newComplaints.size.toString(),
-                        color = MaterialTheme.colorScheme.primary,
+                        color = androidx.compose.ui.graphics.Color(0xFFE53935),
                         isSelected = pagerState.currentPage == 0,
                         onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
                     )
                 }
                 item {
                     StatCard(
-                        title = "Active Processing",
+                        title = "Active",
                         count = state.inProgressComplaints.size.toString(),
-                        color = MaterialTheme.colorScheme.tertiary,
+                        color = androidx.compose.ui.graphics.Color(0xFFE67E22),
                         isSelected = pagerState.currentPage == 1,
                         onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } }
                     )
                 }
                 item {
                     StatCard(
-                        title = "Resolved By Team",
+                        title = "Resolved",
                         count = state.resolvedComplaints.size.toString(),
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = androidx.compose.ui.graphics.Color(0xFF1D9E75),
                         isSelected = pagerState.currentPage == 2,
                         onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } }
                     )
