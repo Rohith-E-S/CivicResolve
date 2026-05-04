@@ -320,21 +320,6 @@ fun ComplaintCard(
                     )
                 }
 
-                // Quick Actions Menu / Admin Update Status Button
-                if (isAdmin) {
-                    IconButton(
-                        onClick = onUpdateStatusClick,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                    ) {
-                        Icon(
-                            Icons.Default.MoreVert,
-                            contentDescription = "Update Status",
-                            tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
             }
         }
     }

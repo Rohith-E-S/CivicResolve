@@ -126,10 +126,13 @@ export const createComplaint = async (req, res) => {
       status: "new",
     });
 
+    // Populate user before sending to Android to avoid parsing errors
+    const populatedComplaint = await Complaint.findById(newComplaint._id).populate("user");
+
     res.status(201).json({
       success: true,
       message: "Complaint submitted successfully",
-      complaint: newComplaint,
+      complaint: populatedComplaint,
     });
 
     // Notify neighbors in the same district
@@ -477,6 +480,7 @@ export const updateAfterImageUrl = async (req, res) => {
     complaint.status = "resolved";
 
     await complaint.save();
+    const populatedComplaint = await Complaint.findById(complaint._id).populate("user");
 
     // Socket broadcasting
     const io = req.app.get("io");
@@ -503,7 +507,7 @@ export const updateAfterImageUrl = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "After Image uploaded successfully",
-      complaint,
+      complaint: populatedComplaint,
     });
   } catch (error) {
     console.log(error.message);
@@ -722,11 +726,12 @@ export const rateComplaint = async (req, res) => {
 
     complaint.rating = rating;
     await complaint.save();
+    const populatedComplaint = await Complaint.findById(complaint._id).populate("user");
 
     res.status(200).json({
       success: true,
       message: "Complaint rated successfully",
-      complaint,
+      complaint: populatedComplaint,
     });
   } catch (error) {
     console.log(error.message);

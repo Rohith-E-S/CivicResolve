@@ -8,7 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -126,23 +128,31 @@ fun AppNavigation(
                     popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(300)) + fadeOut(animationSpec = tween(300)) }
                 ) {
                     composable(Screen.Splash.route) {
-                        SplashScreen(onFinished = {
-                            val destination = when {
-                                !authState.isAuthenticated -> Screen.Login.route
-                                authState.detectedDistrict.isNullOrBlank() -> Screen.LocationOnboarding.route
-                                else -> Screen.Dashboard.route
+                        // Navigate only when BOTH conditions are true:
+                        //   1. The splash animation has finished (splashDone = true via onFinished)
+                        //   2. checkAuth() has completed (authState.isChecking = false)
+                        // Whichever takes longer determines when navigation occurs.
+                        var splashDone by remember { mutableStateOf(false) }
+                        LaunchedEffect(splashDone, authState.isChecking) {
+                            if (splashDone && !authState.isChecking) {
+                                val destination = when {
+                                    !authState.isAuthenticated -> Screen.Login.route
+                                    authState.detectedDistrict.isNullOrBlank() -> Screen.LocationOnboarding.route
+                                    else -> Screen.Dashboard.route
+                                }
+                                navController.navigate(destination) {
+                                    popUpTo(Screen.Splash.route) { inclusive = true }
+                                }
                             }
-                            navController.navigate(destination) {
-                                popUpTo(Screen.Splash.route) { inclusive = true }
-                            }
-                        })
+                        }
+                        SplashScreen(onFinished = { splashDone = true })
                     }
             composable(Screen.Login.route) {
-                LoginScreen(
-                    viewModel = authViewModel,
-                    onNavigateToSignup = { navController.navigate(Screen.Signup.route) },
-                    onNavigateToForgotPassword = { navController.navigate(Screen.ForgotPassword.route) },
-                    onLoginSuccess = {
+                // React to authState changes instead of reading state inside the lambda.
+                // The login() call updates authState.isAuthenticated + detectedDistrict
+                // atomically; by the time this LaunchedEffect fires, both values are fresh.
+                LaunchedEffect(authState.isAuthenticated) {
+                    if (authState.isAuthenticated && !authState.isChecking) {
                         val dest = if (authState.detectedDistrict.isNullOrBlank())
                             Screen.LocationOnboarding.route
                         else
@@ -151,6 +161,12 @@ fun AppNavigation(
                             popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     }
+                }
+                LoginScreen(
+                    viewModel = authViewModel,
+                    onNavigateToSignup = { navController.navigate(Screen.Signup.route) },
+                    onNavigateToForgotPassword = { navController.navigate(Screen.ForgotPassword.route) },
+                    onLoginSuccess = { /* navigation is handled by LaunchedEffect above */ }
                 )
             }
 

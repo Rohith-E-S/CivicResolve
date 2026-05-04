@@ -248,49 +248,6 @@ fun AdminDashboardScreen(
                     modifier = Modifier.weight(1f)
                 )
             } else {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(bottom = 16.dp)
-                ) {
-                    item {
-                        StatCard(
-                            title = "New Actions",
-                            count = state.newComplaints.size.toString(),
-                            color = MaterialTheme.colorScheme.primary,
-                            isSelected = pagerState.currentPage == 0,
-                            onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
-                        )
-                    }
-                    item {
-                        StatCard(
-                            title = "Active Processing",
-                            count = state.inProgressComplaints.size.toString(),
-                            color = MaterialTheme.colorScheme.tertiary,
-                            isSelected = pagerState.currentPage == 1,
-                            onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } }
-                        )
-                    }
-                    item {
-                        StatCard(
-                            title = "Resolved By Team",
-                            count = state.resolvedComplaints.size.toString(),
-                            color = MaterialTheme.colorScheme.secondary,
-                            isSelected = pagerState.currentPage == 2,
-                            onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } }
-                        )
-                    }
-                    item {
-                        StatCard(
-                            title = "Analytics",
-                            count = "Charts",
-                            color = MaterialTheme.colorScheme.outline,
-                            isSelected = pagerState.currentPage == 3,
-                            onClick = { coroutineScope.launch { pagerState.animateScrollToPage(3) } }
-                        )
-                    }
-                }
-
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.weight(1f)
