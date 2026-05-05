@@ -269,7 +269,15 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
         _authState.value = _authState.value.copy(error = message)
     }
 
-    fun logout() {
+    fun logout(context: android.content.Context? = null) {
+        val currentUserId = _authState.value.user?.id
+        if (context != null && currentUserId != null) {
+            val prefs = context.getSharedPreferences("dashboard_prefs", android.content.Context.MODE_PRIVATE)
+            prefs.edit()
+                .remove("banner_dismissed_${currentUserId}")
+                .apply()
+        }
+
         viewModelScope.launch {
             _authState.value = _authState.value.copy(isLoading = true)
             repository.logout()

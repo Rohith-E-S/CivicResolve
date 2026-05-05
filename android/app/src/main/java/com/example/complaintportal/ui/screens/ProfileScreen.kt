@@ -309,7 +309,7 @@ fun ProfileScreen(
             confirmColor = NavyPrimary,
             onConfirm   = { 
                 showLogoutDialog = false
-                authViewModel.logout() 
+                authViewModel.logout(context) 
             },
             onDismiss   = { showLogoutDialog = false },
         )

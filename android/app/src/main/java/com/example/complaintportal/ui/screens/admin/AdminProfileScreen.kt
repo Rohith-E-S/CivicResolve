@@ -374,7 +374,7 @@ fun AdminProfileScreen(
                 Button(
                     onClick  = { 
                         showLogoutDialog = false
-                        authViewModel.logout()
+                        authViewModel.logout(context)
                     },
                     colors   = ButtonDefaults.buttonColors(containerColor = NavyPrimary),
                     shape    = RoundedCornerShape(10.dp),

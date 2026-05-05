@@ -84,7 +84,7 @@ fun LocationOnboardingScreen(
             TopAppBar(
                 title = {},
                 actions = {
-                    IconButton(onClick = { viewModel.logout() }) {
+                    IconButton(onClick = { viewModel.logout(context) }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ExitToApp, 
                             contentDescription = "Logout",
