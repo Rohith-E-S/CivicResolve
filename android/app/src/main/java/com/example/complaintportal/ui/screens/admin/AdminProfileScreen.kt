@@ -33,18 +33,18 @@ import java.io.File
 import java.io.FileOutputStream
 
 // ── Colors ────────────────────────────────────────────────────────────────────
-private val NavyPrimary   = Color(0xFF1A3A6E)
-private val NavyDark      = Color(0xFF0D2247)
-private val TealAccent    = Color(0xFF7ECFC0)
-private val GoldAccent    = Color(0xFFF4A700)   // Admin-exclusive gold
-private val BgLight       = Color(0xFFF2F4F8)
-private val CardWhite     = Color(0xFFFFFFFF)
-private val TextPrimary   = Color(0xFF0D2247)
-private val TextSecondary = Color(0xFF6A7F9A)
-private val DangerRed     = Color(0xFFE53935)
-private val DividerColor  = Color(0xFFE8EDF5)
-private val GreenResolved = Color(0xFF1D9E75)
-private val AmberActive   = Color(0xFFE67E22)
+private val NavyPrimary   @Composable get() = MaterialTheme.colorScheme.primary
+private val NavyDark      @Composable get() = MaterialTheme.colorScheme.onPrimaryContainer
+private val TealAccent    @Composable get() = MaterialTheme.colorScheme.secondary
+private val GoldAccent    @Composable get() = Color(0xFFF4A700)   // Admin-exclusive gold
+private val BgLight       @Composable get() = MaterialTheme.colorScheme.background
+private val CardWhite     @Composable get() = MaterialTheme.colorScheme.surface
+private val TextPrimary   @Composable get() = MaterialTheme.colorScheme.onSurface
+private val TextSecondary @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+private val DangerRed     @Composable get() = MaterialTheme.colorScheme.error
+private val DividerColor  @Composable get() = MaterialTheme.colorScheme.outlineVariant
+private val GreenResolved @Composable get() = Color(0xFF1D9E75)
+private val AmberActive   @Composable get() = Color(0xFFE67E22)
 
 // ── Data model ────────────────────────────────────────────────────────────────
 data class AdminProfile(
@@ -342,11 +342,11 @@ fun AdminProfileScreen(
                 Icon(
                     Icons.Default.Logout,
                     contentDescription = null,
-                    tint     = Color.White,
+                    tint     = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Logout", color = Color.White, fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                Text("Logout", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Medium, fontSize = 15.sp)
             }
 
             Spacer(Modifier.height(28.dp))
@@ -432,7 +432,7 @@ private fun AdminAvatarSection(
                 } else {
                     Text(
                         text       = initials,
-                        color      = Color.White,
+                        color      = MaterialTheme.colorScheme.onPrimary,
                         fontSize   = 32.sp,
                         fontWeight = FontWeight.Bold,
                     )
@@ -461,14 +461,14 @@ private fun AdminAvatarSection(
                     .size(30.dp)
                     .clip(CircleShape)
                     .background(GoldAccent)
-                    .border(2.dp, Color.White, CircleShape)
+                    .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
                     .clickable { onEditClick() }
                     .offset(x = (-4).dp, y = (-4).dp),
             ) {
                 Icon(
                     Icons.Default.Edit,
                     contentDescription = "Edit",
-                    tint     = Color.White,
+                    tint     = Color.White, // Keeps white tint as it's on GoldAccent which doesn't adapt to dark mode
                     modifier = Modifier.size(14.dp),
                 )
             }
@@ -548,7 +548,7 @@ private fun AdminStatsSection(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column {
-                Text("Resolution Rate", fontSize = 12.sp, color = Color.White.copy(alpha = 0.7f))
+                Text("Resolution Rate", fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f))
                 Spacer(Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
                     val animatedRate by animateIntAsState(
@@ -563,12 +563,12 @@ private fun AdminStatsSection(
                         color      = TealAccent,
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("of issues resolved", fontSize = 11.sp, color = Color.White.copy(alpha = 0.6f), modifier = Modifier.padding(bottom = 4.dp))
+                    Text("of issues resolved", fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f), modifier = Modifier.padding(bottom = 4.dp))
                 }
             }
 
             Column(horizontalAlignment = Alignment.End) {
-                Text("Avg. Resolution", fontSize = 11.sp, color = Color.White.copy(alpha = 0.6f))
+                Text("Avg. Resolution", fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f))
                 Spacer(Modifier.height(2.dp))
                 val animatedDays by animateIntAsState(
                     targetValue   = avgResolutionDays,
@@ -788,9 +788,9 @@ private fun ToggleRow(
             checked         = checked,
             onCheckedChange = onToggle,
             colors          = SwitchDefaults.colors(
-                checkedThumbColor   = Color.White,
+                checkedThumbColor   = MaterialTheme.colorScheme.onPrimary,
                 checkedTrackColor   = NavyPrimary,
-                uncheckedThumbColor = Color.White,
+                uncheckedThumbColor = MaterialTheme.colorScheme.surface,
                 uncheckedTrackColor = TextSecondary.copy(alpha = 0.3f),
             ),
         )

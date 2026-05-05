@@ -80,7 +80,7 @@ fun AdminDashboardScreen(
                         Surface(
                             color = androidx.compose.ui.graphics.Color(0xFFF4A700).copy(alpha = 0.1f),
                             shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.padding(top = 4.dp)
+                            modifier = Modifier.padding(top = 0.dp)
                         ) {
                             Text(
                                 text = "ADMIN",
@@ -116,11 +116,7 @@ fun AdminDashboardScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Text("Admin Console", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
                 AdminStatsBar(
                     totalCount    = (state.newComplaints + state.inProgressComplaints + state.resolvedComplaints).size,
                     newCount      = state.newComplaints.size,
@@ -128,7 +124,7 @@ fun AdminDashboardScreen(
                     resolvedCount = state.resolvedComplaints.size,
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -191,8 +187,12 @@ fun AdminDashboardScreen(
                                 onClick = { sortOption = SortOption.DATE_ASC; showSortMenu = false }
                             )
                             DropdownMenuItem(
-                                text = { Text("Highest Rated") },
+                                text = { Text("Highest Rating") },
                                 onClick = { sortOption = SortOption.RATING_DESC; showSortMenu = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Most Upvotes") },
+                                onClick = { sortOption = SortOption.UPVOTES_DESC; showSortMenu = false }
                             )
                         }
                     }
@@ -329,6 +329,7 @@ fun AdminDashboardScreen(
                                 SortOption.DATE_DESC -> it.sortedByDescending { item -> item.createdAt }
                                 SortOption.DATE_ASC -> it.sortedBy { item -> item.createdAt }
                                 SortOption.RATING_DESC -> it.sortedByDescending { item -> item.rating }
+                                SortOption.UPVOTES_DESC -> it.sortedByDescending { item -> item.supportCount ?: 0 }
                             }
                         }
 

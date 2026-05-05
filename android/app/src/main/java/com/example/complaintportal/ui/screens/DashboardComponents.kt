@@ -393,7 +393,7 @@ fun CustomPullToRefreshIndicator(
 }
 
 enum class SortOption {
-    DATE_DESC, DATE_ASC, RATING_DESC
+    DATE_DESC, DATE_ASC, RATING_DESC, UPVOTES_DESC
 }
 
 @Composable
@@ -600,12 +600,12 @@ fun AdminStatsBar(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment     = Alignment.CenterVertically,
     ) {
-        StatCell(value = totalCount,    label = "Total",    color = Color(0xFF1A3A6E))
+        StatCell(value = totalCount,    label = "Total",    color = MaterialTheme.colorScheme.primary)
         StatBarDivider()
         StatCell(value = newCount,      label = "New",      color = Color(0xFFE53935))
         StatBarDivider()
@@ -632,7 +632,7 @@ private fun StatCell(value: Int, label: String, color: Color) {
         Text(
             text     = label,
             fontSize = 10.sp,
-            color    = Color(0xFF6A7F9A),
+            color    = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -643,6 +643,6 @@ private fun StatBarDivider() {
         modifier = Modifier
             .width(1.dp)
             .height(24.dp)
-            .background(Color(0xFFE8EDF5))
+            .background(MaterialTheme.colorScheme.outlineVariant)
     )
 }

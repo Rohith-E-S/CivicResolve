@@ -358,6 +358,10 @@ fun UserDashboardScreen(
                             text = { Text("Highest Rated") },
                             onClick = { sortOption = SortOption.RATING_DESC; showSortMenu = false }
                         )
+                        DropdownMenuItem(
+                            text = { Text("Most Upvotes") },
+                            onClick = { sortOption = SortOption.UPVOTES_DESC; showSortMenu = false }
+                        )
                     }
                 }
 
@@ -635,6 +639,7 @@ fun UserDashboardScreen(
                                         SortOption.DATE_DESC -> unsorted.sortedByDescending { it.createdAt }
                                         SortOption.DATE_ASC -> unsorted.sortedBy { it.createdAt }
                                         SortOption.RATING_DESC -> unsorted.sortedByDescending { it.rating }
+                                        SortOption.UPVOTES_DESC -> unsorted.sortedByDescending { it.supportCount ?: 0 }
                                     }
                                 }
 
