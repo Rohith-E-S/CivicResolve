@@ -7,6 +7,7 @@ import com.example.complaintportal.data.remote.CookieJarImpl
 import com.example.complaintportal.data.repository.AuthRepository
 import com.example.complaintportal.data.repository.ComplaintRepository
 import com.example.complaintportal.data.repository.MessageRepository
+import com.example.complaintportal.data.repository.AnalyticsRepository
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.OkHttpClient
@@ -18,6 +19,7 @@ interface AppContainer {
     val authRepository: AuthRepository
     val complaintRepository: ComplaintRepository
     val messageRepository: MessageRepository
+    val analyticsRepository: AnalyticsRepository
     val notificationApiService: NotificationApiService
     val cookieJar: CookieJarImpl
     val moshi: Moshi
@@ -28,7 +30,7 @@ interface AppContainer {
 class DefaultAppContainer(private val context: Context) : AppContainer {
     // For Emulator: http://10.0.2.2:4000
     // For Physical Device: http://YOUR_IP_ADDRESS:4000
-        override val socketUrl = "https://nonadjacent-unsurnamed-lizabeth.ngrok-free.dev"
+    override val socketUrl = "https://nonadjacent-unsurnamed-lizabeth.ngrok-free.dev"
     override val baseUrl = "$socketUrl/api/"
     
     override val moshi = Moshi.Builder()
@@ -63,6 +65,10 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
 
     override val messageRepository: MessageRepository by lazy {
         MessageRepository(retrofitService)
+    }
+
+    override val analyticsRepository: AnalyticsRepository by lazy {
+        AnalyticsRepository(retrofitService)
     }
 
     override val notificationApiService: NotificationApiService by lazy {

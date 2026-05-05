@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.Color
 import com.example.complaintportal.ui.viewmodel.ComplaintViewModel
 import kotlinx.coroutines.launch
 
@@ -38,7 +39,8 @@ import kotlinx.coroutines.launch
 fun AdminDashboardScreen(
     viewModel: ComplaintViewModel,
     userId: String,
-    onNavigateToDetail: (String) -> Unit
+    onNavigateToDetail: (String) -> Unit,
+    onNavigateToAnalytics: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
@@ -286,27 +288,66 @@ fun AdminDashboardScreen(
                     modifier = Modifier.weight(1f)
                 ) { page ->
                     if (page == 3) {
-                        val allComplaints = state.newComplaints + state.inProgressComplaints + state.resolvedComplaints
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = 16.dp)
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(24.dp)
+                                .verticalScroll(rememberScrollState())
                         ) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Complaints by Status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            StatusBarChart(state.newComplaints.size, state.inProgressComplaints.size, state.resolvedComplaints.size)
+                            // Use the new KPI summary or a simplified version here
+                            // For now, let's keep the charts but make the navigation to the "New Analysis Page" much more obvious
                             
-                            Text("Complaints by Category", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            if (allComplaints.isNotEmpty()) {
-                                CategoryPieChart(allComplaints)
-                            } else {
-                                Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                                    Text("No data for pie chart", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                                    .clickable { onNavigateToAnalytics() }
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        Icons.Default.Analytics, 
+                                        contentDescription = null, 
+                                        modifier = Modifier.size(48.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+                                    Text(
+                                        "Open Detailed Analytics", 
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        "Resolution rates, trends, and hotspots",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
+
                             Spacer(modifier = Modifier.height(16.dp))
+                            
+                            Text("Quick Summary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            StatusBarChart(state.newComplaints.size, state.inProgressComplaints.size, state.resolvedComplaints.size)
+                            
+                            Spacer(modifier = Modifier.height(24.dp))
+                            
+                            Button(
+                                onClick = onNavigateToAnalytics,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A3A6E))
+                            ) {
+                                Icon(Icons.Default.Launch, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Launch Full Analytics Page")
+                            }
+                            
+                            Spacer(modifier = Modifier.height(32.dp))
                         }
                     } else {
                         val list = when (page) {

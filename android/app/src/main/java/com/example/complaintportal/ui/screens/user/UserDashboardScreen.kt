@@ -240,11 +240,7 @@ fun UserDashboardScreen(
                             .padding(horizontal = 16.dp)
                             .fillMaxWidth()
                             .padding(bottom = 16.dp)
-                            .clickable { 
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                selectedTab = 1 // Switch to Community Hub
-                                coroutineScope.launch { pagerState.animateScrollToPage(2) } // Switch to Resolved
-                            },
+                            .clickable { onNavigateToDetail("analytics") },
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                         shape = RoundedCornerShape(20.dp)
@@ -490,7 +486,7 @@ fun UserDashboardScreen(
                             count = "Charts",
                             color = MaterialTheme.colorScheme.outline,
                             isSelected = pagerState.currentPage == 3,
-                            onClick = { coroutineScope.launch { pagerState.animateScrollToPage(3) } }
+                            onClick = { onNavigateToDetail("analytics") }
                         )
                     }
                 }
