@@ -32,3 +32,11 @@ export const protectRoute = async (req, res, next) => {
     });
   }
 };
+
+export const adminOnly = (req, res, next) => {
+  if (req.user && req.user.isAdmin) {
+    next();
+  } else {
+    res.status(403).json({ success: false, message: "Admin access required" });
+  }
+};

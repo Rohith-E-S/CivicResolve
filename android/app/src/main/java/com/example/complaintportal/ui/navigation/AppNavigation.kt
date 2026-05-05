@@ -3,7 +3,9 @@ package com.example.complaintportal.ui.navigation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -59,6 +61,8 @@ sealed class Screen(val route: String) {
     object CreateComplaint    : Screen("create_complaint")
     object AiAnalysis         : Screen("ai_analysis")
     object Notifications      : Screen("notifications")
+    object Analytics          : Screen("analytics")
+    object AdminAnalytics     : Screen("admin_analytics")
 
     object ComplaintDetail    : Screen("complaint_detail/{complaintId}") {
         fun createRoute(complaintId: String) = "complaint_detail/$complaintId"
@@ -87,6 +91,9 @@ fun AppNavigation(
             appContainer.moshi,
             appContainer.socketUrl
         )
+    )
+    val analyticsViewModel: AnalyticsViewModel = viewModel(
+        factory = AnalyticsViewModelFactory(appContainer.analyticsRepository)
     )
 
     val authState by authViewModel.authState.collectAsState()
@@ -248,6 +255,9 @@ fun AppNavigation(
                                     } else {
                                         navController.navigate(Screen.ComplaintDetail.createRoute(complaintId)) 
                                     }
+                                },
+                                onNavigateToAnalytics = {
+                                    navController.navigate(Screen.AdminAnalytics.route)
                                 }
                             )
                         } else {
@@ -262,6 +272,8 @@ fun AppNavigation(
                                 onNavigateToDetail = { complaintId ->
                                     if (complaintId == "profile") {
                                         navController.navigate(Screen.Profile.route)
+                                    } else if (complaintId == "analytics") {
+                                        navController.navigate(Screen.Analytics.route)
                                     } else {
                                         navController.navigate(Screen.ComplaintDetail.createRoute(complaintId))
                                     }
@@ -418,7 +430,109 @@ fun AppNavigation(
                     navController.popBackStack()
                 }
             }
+
+            composable(Screen.Analytics.route) {
+                val analyticsData by analyticsViewModel.analyticsData.collectAsState()
+                val isLoading by analyticsViewModel.isLoading.collectAsState()
+                val error by analyticsViewModel.error.collectAsState()
+
+                LaunchedEffect(Unit) {
+                    analyticsViewModel.fetchAnalytics()
+                }
+
+                if (isLoading && analyticsData == null) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else if (analyticsData != null) {
+                    val dto = analyticsData!!
+                    UserAnalyticsScreen(
+                        data = AnalyticsData(
+                            totalReports = dto.totalReports,
+                            resolvedCount = dto.resolvedCount,
+                            activeCount = dto.activeCount,
+                            newCount = dto.newCount,
+                            communityRankPct = dto.communityRankPct,
+                            location = dto.location,
+                            period = dto.period,
+                            weeklyTrend = dto.weeklyTrend,
+                            weekLabels = dto.weekLabels,
+                            categoryBreakdown = dto.categoryBreakdown.map { it.label to it.count }
+                        ),
+                        onBack = { navController.popBackStack() }
+                    )
+                } else if (error != null) {
+                    // Fallback to local stats if fetch fails or just show error
+                    val state by complaintViewModel.state.collectAsState()
+                    val allComplaints = state.newComplaints + state.inProgressComplaints + state.resolvedComplaints
+                    val categories = allComplaints.groupBy { it.category }.map { it.key to it.value.size }.sortedByDescending { it.second }
+
+                    UserAnalyticsScreen(
+                        data = AnalyticsData(
+                            totalReports = allComplaints.size,
+                            resolvedCount = state.resolvedComplaints.size,
+                            activeCount = state.inProgressComplaints.size,
+                            newCount = state.newComplaints.size,
+                            communityRankPct = 0,
+                            location = authState.detectedDistrict ?: "Your Area",
+                            period = "Error Loading Metrics",
+                            weeklyTrend = listOf(0, 0, 0, 0, 0, 0, 0),
+                            weekLabels = listOf("M", "T", "W", "T", "F", "S", "S"),
+                            categoryBreakdown = categories
+                        ),
+                        onBack = { navController.popBackStack() },
+                        onPeriodChange = { newPeriod ->
+                            analyticsViewModel.fetchAnalytics(newPeriod)
+                        }
+                    )
+                }
+            }
+
+            composable(Screen.AdminAnalytics.route) {
+                val adminData by analyticsViewModel.adminAnalyticsData.collectAsState()
+                val isLoading by analyticsViewModel.isLoading.collectAsState()
+                val error by analyticsViewModel.error.collectAsState()
+
+                LaunchedEffect(Unit) {
+                    analyticsViewModel.fetchAdminAnalytics()
+                }
+
+                if (isLoading && adminData == null) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else if (adminData != null) {
+                    val dto = adminData!!
+                    AdminAnalyticsScreen(
+                        data = AdminAnalyticsData(
+                            jurisdiction = dto.jurisdiction,
+                            period = dto.period,
+                            totalComplaints = dto.totalComplaints,
+                            resolvedCount = dto.resolvedCount,
+                            activeCount = dto.activeCount,
+                            newCount = dto.newCount,
+                            avgResolutionDays = dto.avgResolutionDays,
+                            resolutionRatePct = dto.resolutionRatePct,
+                            weeklyIncoming = dto.weeklyIncoming,
+                            weeklyResolved = dto.weeklyResolved,
+                            weekLabels = dto.weekLabels,
+                            categoryBreakdown = dto.categoryBreakdown.map { it.label to it.count },
+                            districtBreakdown = dto.districtBreakdown.map { it.label to it.count },
+                            topReporters = dto.topReporters.map { it.name to it.count },
+                            resolutionTimeBuckets = dto.resolutionTimeBuckets.map { it.label to it.count }
+                        ),
+                        onBack = { navController.popBackStack() },
+                        onPeriodChange = { newPeriod ->
+                            analyticsViewModel.fetchAdminAnalytics(newPeriod)
+                        }
+                    )
+                } else if (error != null) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Error: $error", color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         }
     }
+}
+}

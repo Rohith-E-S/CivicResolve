@@ -153,4 +153,11 @@ interface ApiService {
     // ---- Message APIs ----
     @GET("messages/{complaintId}")
     suspend fun getMessages(@Path("complaintId") complaintId: String): Response<MessageListResponse>
+
+    // ---- Analytics APIs ----
+    @GET("complaint/analytics/user")
+    suspend fun getUserAnalytics(@Query("period") period: String?): Response<AnalyticsResponse>
+
+    @GET("complaint/analytics/admin")
+    suspend fun getAdminAnalytics(@Query("period") period: String?): Response<AdminAnalyticsResponse>
 }
