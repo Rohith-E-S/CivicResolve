@@ -369,14 +369,6 @@ fun LoginScreen(
                                 fontSize = 26.sp
                             )
                         )
-                        Text(
-                            "Alice", 
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1A1A1A),
-                                fontSize = 26.sp
-                            )
-                        )
                     }
                     Image(
                         painter = rememberAsyncImagePainter("https://i.pravatar.cc/150?u=alice"),
