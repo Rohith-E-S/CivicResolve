@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -330,32 +331,49 @@ fun UserDashboardScreen(
                     onClick = { showSortMenu = true },
                     modifier = Modifier
                         .size(46.dp)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), CircleShape)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), CircleShape)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Sort,
-                        contentDescription = "Sort",
+                        imageVector = Icons.Rounded.Tune,
+                        contentDescription = "Sort / Filter",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                     DropdownMenu(
                         expanded = showSortMenu,
-                        onDismissRequest = { showSortMenu = false }
+                        onDismissRequest = { showSortMenu = false },
+                        shape = RoundedCornerShape(16.dp),
+                        shadowElevation = 8.dp,
+                        tonalElevation = 8.dp,
+                        modifier = Modifier.width(220.dp).background(MaterialTheme.colorScheme.surface)
                     ) {
+                        Text(
+                            "Sort By",
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(bottom = 4.dp))
+                        
                         DropdownMenuItem(
-                            text = { Text("Newest First") },
+                            text = { Text("Newest First", fontWeight = if (sortOption == SortOption.DATE_DESC) FontWeight.Bold else FontWeight.Normal) },
+                            leadingIcon = { Icon(Icons.Default.AccessTime, contentDescription = null, tint = if (sortOption == SortOption.DATE_DESC) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
                             onClick = { sortOption = SortOption.DATE_DESC; showSortMenu = false }
                         )
                         DropdownMenuItem(
-                            text = { Text("Oldest First") },
+                            text = { Text("Oldest First", fontWeight = if (sortOption == SortOption.DATE_ASC) FontWeight.Bold else FontWeight.Normal) },
+                            leadingIcon = { Icon(Icons.Default.History, contentDescription = null, tint = if (sortOption == SortOption.DATE_ASC) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
                             onClick = { sortOption = SortOption.DATE_ASC; showSortMenu = false }
                         )
                         DropdownMenuItem(
-                            text = { Text("Highest Rated") },
+                            text = { Text("Highest Rated", fontWeight = if (sortOption == SortOption.RATING_DESC) FontWeight.Bold else FontWeight.Normal) },
+                            leadingIcon = { Icon(Icons.Default.Star, contentDescription = null, tint = if (sortOption == SortOption.RATING_DESC) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
                             onClick = { sortOption = SortOption.RATING_DESC; showSortMenu = false }
                         )
                         DropdownMenuItem(
-                            text = { Text("Most Upvotes") },
+                            text = { Text("Most Upvotes", fontWeight = if (sortOption == SortOption.UPVOTES_DESC) FontWeight.Bold else FontWeight.Normal) },
+                            leadingIcon = { Icon(Icons.Default.ThumbUp, contentDescription = null, tint = if (sortOption == SortOption.UPVOTES_DESC) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
                             onClick = { sortOption = SortOption.UPVOTES_DESC; showSortMenu = false }
                         )
                     }

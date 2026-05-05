@@ -63,10 +63,10 @@ import com.google.android.gms.common.api.CommonStatusCodes
 // --- Styled Components ---
 
 @Composable
-fun AuthBackground(imageUrl: String, content: @Composable () -> Unit) {
+fun AuthBackground(imageModel: Any, content: @Composable () -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
-            painter = rememberAsyncImagePainter(imageUrl),
+            painter = rememberAsyncImagePainter(imageModel),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
@@ -302,7 +302,7 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
-    AuthBackground(imageUrl = "https://images.unsplash.com/photo-1501785888041-af3ef285b470") {
+    AuthBackground(imageModel = R.drawable.login_bg) {
         // FIXED HEADER: This stays behind the scrollable column
         FixedHeaderContent()
 
@@ -454,7 +454,7 @@ fun SignupScreen(
         }
     }
 
-    AuthBackground(imageUrl = "https://images.unsplash.com/photo-1441974231531-c6227db76b6e") {
+    AuthBackground(imageModel = "https://images.unsplash.com/photo-1441974231531-c6227db76b6e") {
         // FIXED HEADER
         FixedHeaderContent()
 
@@ -612,7 +612,7 @@ fun ForgotPasswordScreen(
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
 
-    AuthBackground(imageUrl = "https://images.unsplash.com/photo-1501785888041-af3ef285b470") {
+    AuthBackground(imageModel = "https://images.unsplash.com/photo-1501785888041-af3ef285b470") {
         // FIXED HEADER (Simulated with title change)
         FixedHeaderContent(title = "Reset Password")
 
@@ -761,7 +761,7 @@ fun OtpVerifyScreen(
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
 
-    AuthBackground(imageUrl = "https://images.unsplash.com/photo-1501785888041-af3ef285b470") {
+    AuthBackground(imageModel = "https://images.unsplash.com/photo-1501785888041-af3ef285b470") {
         // FIXED HEADER
         FixedHeaderContent(title = "Verify Account")
 
