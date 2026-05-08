@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import com.example.complaintportal.ui.screens.SortOption
 
 data class ComplaintState(
     val isLoading: Boolean = false,
@@ -26,7 +27,8 @@ data class ComplaintState(
     val isCommunityLoading: Boolean = false,
     val aiResult: AiAnalysisResult? = null,
     val pendingComplaintData: PendingComplaintData? = null,
-    val nearbyComplaints: List<NearbyComplaint> = emptyList()
+    val nearbyComplaints: List<NearbyComplaint> = emptyList(),
+    val sortOption: SortOption = SortOption.DATE_DESC
 )
 
 data class PendingComplaintData(
@@ -45,6 +47,10 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
 
     private val _state = MutableStateFlow(ComplaintState())
     val state: StateFlow<ComplaintState> = _state.asStateFlow()
+
+    fun updateSortOption(option: SortOption) {
+        _state.value = _state.value.copy(sortOption = option)
+    }
 
     fun fetchUserComplaints(userId: String? = null) {
         viewModelScope.launch {
