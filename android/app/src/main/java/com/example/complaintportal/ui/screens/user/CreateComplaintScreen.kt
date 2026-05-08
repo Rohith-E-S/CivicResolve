@@ -362,16 +362,19 @@ fun CreateComplaintScreen(
                                 Toast.makeText(context, "Error preparing image: ${e.message}", Toast.LENGTH_SHORT).show()
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().height(56.dp).shadow(if (isSubmitEnabled) 8.dp else 0.dp, RoundedCornerShape(16.dp)),
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
                         shape = RoundedCornerShape(16.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isSubmitEnabled) Color(0xFF00796B) else MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = if (isSubmitEnabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         ),
                         enabled = isSubmitEnabled
                     ) {
                         if (state.isLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
                         } else {
                             Text(stringResource(R.string.submit_report), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
                         }
