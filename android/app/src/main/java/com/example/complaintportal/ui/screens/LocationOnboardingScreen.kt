@@ -69,7 +69,7 @@ fun LocationOnboardingScreen(
                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         if (granted) {
             scope.launch {
-                detectLocation(context, fusedLocationClient) { city, district ->
+                detectLocation(context, fusedLocationClient) { city, district, _, _ ->
                     detectedCity = city
                     detectedDistrict = district
                     isLocating = false

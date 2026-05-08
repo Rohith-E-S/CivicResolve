@@ -25,7 +25,8 @@ data class ComplaintState(
     val statsScope: String = "Global",
     val isCommunityLoading: Boolean = false,
     val aiResult: AiAnalysisResult? = null,
-    val pendingComplaintData: PendingComplaintData? = null
+    val pendingComplaintData: PendingComplaintData? = null,
+    val nearbyComplaints: List<NearbyComplaint> = emptyList()
 )
 
 data class PendingComplaintData(
@@ -61,8 +62,8 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
                     _state.value = _state.value.copy(
                         isLoading = false,
                         supportedIds = _state.value.supportedIds + newSupportedIds,
-                        newComplaints = complaints.filter { it.status.lowercase() == "new" },
-                        inProgressComplaints = complaints.filter { it.status.lowercase() == "in progress" },
+                        newComplaints = complaints.filter { it.status.lowercase() in listOf("new", "under_review") },
+                        inProgressComplaints = complaints.filter { it.status.lowercase() == "in_progress" },
                         resolvedComplaints = complaints.filter { it.status.lowercase() == "resolved" }
                     )
                 } else {
@@ -93,7 +94,7 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
                     _state.value = _state.value.copy(
                         isLoading = false,
                         supportedIds = _state.value.supportedIds + newSupportedIds,
-                        newComplaints = data?.newComplaint ?: emptyList(),
+                        newComplaints = (data?.newComplaint ?: emptyList()) + (data?.underReviewComplaint ?: emptyList()),
                         inProgressComplaints = data?.inProgressComplaint ?: emptyList(),
                         resolvedComplaints = data?.resolvedComplaint ?: emptyList()
                     )
@@ -318,6 +319,17 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
                 }
             }.onFailure {
                 _state.value = _state.value.copy(isCommunityLoading = false, error = it.message)
+            }
+        }
+    }
+
+    fun fetchNearbyComplaints(lat: Double, lng: Double, radius: Int = 500) {
+        viewModelScope.launch {
+            val result = repository.getNearbyComplaints(lat, lng, radius)
+            result.onSuccess { response ->
+                if (response.success) {
+                    _state.value = _state.value.copy(nearbyComplaints = response.complaints)
+                }
             }
         }
     }

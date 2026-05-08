@@ -24,7 +24,33 @@ data class Complaint(
     val supportCount: Int? = 0,
     val supporters: List<String>? = emptyList(),
     val createdAt: String?,
-    val updatedAt: String?
+    val updatedAt: String?,
+    @Json(name = "timestamps") val timestamps: ComplaintTimestamps? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ComplaintTimestamps(
+    @Json(name = "reported")    val reported:    String? = null,
+    @Json(name = "underReview") val underReview: String? = null,
+    @Json(name = "inProgress")  val inProgress:  String? = null,
+    @Json(name = "resolved")    val resolved:    String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class NearbyComplaint(
+    @Json(name = "_id")            val id:              String,
+    @Json(name = "category")       val category:        String,
+    @Json(name = "description")    val description:     String,
+    @Json(name = "status")         val status:          String,
+    @Json(name = "distanceMeters") val distanceMeters:  Int,
+    @Json(name = "createdAt")      val createdAt:       String,
+)
+
+@JsonClass(generateAdapter = true)
+data class NearbyComplaintsResponse(
+    @Json(name = "success")    val success:    Boolean,
+    @Json(name = "count")      val count:      Int,
+    @Json(name = "complaints") val complaints: List<NearbyComplaint>,
 )
 
 data class AiAnalysisResult(
@@ -53,6 +79,7 @@ data class ComplaintListResponse(
 @JsonClass(generateAdapter = true)
 data class AllComplaintsData(
     val newComplaint: List<Complaint>?,
+    val underReviewComplaint: List<Complaint>?,
     val inProgressComplaint: List<Complaint>?,
     val resolvedComplaint: List<Complaint>?
 )
@@ -130,4 +157,9 @@ data class ActiveChatResponse(
     val message: String?,
     val complaints: List<Complaint>?,
     val pagination: Pagination?
+)
+
+@JsonClass(generateAdapter = true)
+data class UpdateStatusRequest(
+    val status: String
 )

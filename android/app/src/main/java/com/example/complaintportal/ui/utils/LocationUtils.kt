@@ -14,7 +14,7 @@ import java.util.*
 suspend fun detectLocation(
     context: Context,
     fusedLocationClient: FusedLocationProviderClient,
-    onResult: (String?, String?) -> Unit
+    onResult: (String?, String?, Double?, Double?) -> Unit
 ) {
     try {
         val location = fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null).await()
@@ -28,18 +28,18 @@ suspend fun detectLocation(
                     val city = address.locality
                     val district = address.subAdminArea ?: address.locality
                     withContext(Dispatchers.Main) {
-                        onResult(city, district)
+                        onResult(city, district, location.latitude, location.longitude)
                     }
                 } else {
                     withContext(Dispatchers.Main) {
-                        onResult(null, null)
+                        onResult(null, null, null, null)
                     }
                 }
             }
         } else {
-            onResult(null, null)
+            onResult(null, null, null, null)
         }
     } catch (e: Exception) {
-        onResult(null, null)
+        onResult(null, null, null, null)
     }
 }

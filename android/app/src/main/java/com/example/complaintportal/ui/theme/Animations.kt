@@ -98,8 +98,9 @@ fun MorphingStatusBadge(
         modifier = modifier
     ) { currentStatus ->
         val (bgColor, textColor) = when (currentStatus.lowercase()) {
-            "pending" -> Color(0xFFFFF3E0) to Color(0xFFE65100)
-            "in progress" -> Color(0xFFE3F2FD) to Color(0xFF1565C0)
+            "new" -> Color(0xFFFFEBEE) to Color(0xFFD32F2F)
+            "under_review" -> Color(0xFFFFF3E0) to Color(0xFFE65100)
+            "in_progress" -> Color(0xFFE3F2FD) to Color(0xFF1565C0)
             "resolved" -> Color(0xFFE8F5E9) to Color(0xFF2E7D32)
             else -> Color.LightGray to Color.DarkGray
         }

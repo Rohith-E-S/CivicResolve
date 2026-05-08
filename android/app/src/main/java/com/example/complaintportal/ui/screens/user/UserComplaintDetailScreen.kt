@@ -33,6 +33,7 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.complaintportal.ui.viewmodel.ComplaintViewModel
 import androidx.compose.ui.res.stringResource
 import com.example.complaintportal.R
+import com.example.complaintportal.ui.components.ComplaintTimeline
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 @Composable
@@ -201,6 +202,13 @@ fun UserComplaintDetailScreen(
                         }
                     }
                 }
+
+                // Timeline Section
+                ComplaintTimeline(
+                    currentStatus = complaint.status,
+                    timestamps = complaint.timestamps,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 Spacer(modifier = Modifier.height(24.dp))
 

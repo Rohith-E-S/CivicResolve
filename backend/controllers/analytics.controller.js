@@ -30,7 +30,7 @@ export const getUserAnalytics = async (req, res) => {
     const complaints = await Complaint.find(dateFilter);
     const totalReports = complaints.length;
     const resolvedCount = complaints.filter(c => c.status.toLowerCase() === "resolved").length;
-    const activeCount = complaints.filter(c => c.status.toLowerCase() === "in progress").length;
+    const activeCount = complaints.filter(c => c.status.toLowerCase() === "in_progress").length;
     const newCount = complaints.filter(c => c.status.toLowerCase() === "new").length;
 
     // 2. Weekly Trend (Last 7 days)
@@ -163,7 +163,7 @@ export const getAdminAnalytics = async (req, res) => {
     const allComplaints = await Complaint.find(dateFilter);
     const totalComplaints = allComplaints.length;
     const resolvedCount = allComplaints.filter(c => c.status.toLowerCase() === "resolved").length;
-    const activeCount = allComplaints.filter(c => c.status.toLowerCase() === "in progress").length;
+    const activeCount = allComplaints.filter(c => c.status.toLowerCase() === "in_progress").length;
     const newCount = allComplaints.filter(c => c.status.toLowerCase() === "new").length;
 
     // 2. Resolution Rate & Avg Time

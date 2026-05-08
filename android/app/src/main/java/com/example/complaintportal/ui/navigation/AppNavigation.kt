@@ -460,7 +460,10 @@ fun AppNavigation(
                             weekLabels = dto.weekLabels,
                             categoryBreakdown = dto.categoryBreakdown.map { it.label to it.count }
                         ),
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        onPeriodChange = { newPeriod ->
+                            analyticsViewModel.fetchAnalytics(newPeriod)
+                        }
                     )
                 } else if (error != null) {
                     // Fallback to local stats if fetch fails or just show error

@@ -79,7 +79,7 @@ interface ApiService {
     @POST("complaint/update-complaint-status/{id}")
     suspend fun updateComplaintStatus(
         @Path("id") id: String,
-        @Body request: Map<String, String>
+        @Body request: UpdateStatusRequest
     ): Response<SingleComplaintResponse>
 
     @Multipart
@@ -149,6 +149,13 @@ interface ApiService {
         @Query("limit") limit: Int? = null,
         @Query("status") status: String? = null
     ): Response<PaginatedComplaintResponse>
+
+    @GET("complaint/nearby")
+    suspend fun getNearbyComplaints(
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double,
+        @Query("radius") radius: Int = 500
+    ): Response<NearbyComplaintsResponse>
 
     // ---- Message APIs ----
     @GET("messages/{complaintId}")

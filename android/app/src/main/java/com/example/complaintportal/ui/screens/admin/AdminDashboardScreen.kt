@@ -372,6 +372,7 @@ fun AdminDashboardScreen(
                                 SortOption.DATE_ASC -> it.sortedBy { item -> item.createdAt }
                                 SortOption.RATING_DESC -> it.sortedByDescending { item -> item.rating }
                                 SortOption.UPVOTES_DESC -> it.sortedByDescending { item -> item.supportCount ?: 0 }
+                                SortOption.NEAREST -> it
                             }
                         }
 
