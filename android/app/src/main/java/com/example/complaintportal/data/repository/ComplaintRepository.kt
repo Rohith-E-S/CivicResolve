@@ -91,7 +91,7 @@ class ComplaintRepository(private val apiService: ApiService) {
     suspend fun updateComplaintStatus(id: String, status: String): Result<SingleComplaintResponse> =
         withContext(Dispatchers.IO) {
             try {
-                val response = apiService.updateComplaintStatus(id, mapOf("status" to status))
+                val response = apiService.updateComplaintStatus(id, UpdateStatusRequest(status))
                 if (response.isSuccessful && response.body() != null) {
                     Result.success(response.body()!!)
                 } else {
@@ -179,6 +179,20 @@ class ComplaintRepository(private val apiService: ApiService) {
     suspend fun getPublicFeed(district: String? = null): Result<ComplaintListResponse> = withContext(Dispatchers.IO) {
         try {
             val response = apiService.getPublicFeed(district)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorMsg = parseError(response.errorBody()?.string())
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getNearbyComplaints(lat: Double, lng: Double, radius: Int = 500): Result<NearbyComplaintsResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getNearbyComplaints(lat, lng, radius)
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {

@@ -71,9 +71,26 @@ const complaintSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["new", "in progress", "resolved"],
+      enum: ["new", "under_review", "in_progress", "resolved"],
       default: "new",
       lowercase: true,
+    },
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        default: [0, 0],
+      },
+    },
+    timestamps: {
+      reported: { type: Date, default: Date.now },
+      underReview: { type: Date, default: null },
+      inProgress: { type: Date, default: null },
+      resolved: { type: Date, default: null },
     },
     rating: {
       type: Number,
@@ -112,6 +129,7 @@ const complaintSchema = new mongoose.Schema(
 
 complaintSchema.index({ isDeleted: 1, createdAt: -1 });
 complaintSchema.index({ city: 1, state: 1, category: 1, status: 1, isDeleted: 1 });
+complaintSchema.index({ location: "2dsphere" });
 
 const Complaint = mongoose.model("Complaint", complaintSchema);
 export default Complaint;

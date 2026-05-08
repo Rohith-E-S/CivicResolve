@@ -97,7 +97,7 @@ class ComplaintApplication : Application() {
                             for (c in complaints) {
                                 val oldStatus = knownStatuses[c.id]
                                 if (oldStatus != null && oldStatus != c.status) {
-                                    if (c.status.equals("in progress", true) || c.status.equals("resolved", true)) {
+                                    if (c.status.equals("in_progress", true) || c.status.equals("resolved", true)) {
                                         val title = "Complaint Status Updated"
                                         val msg = "Case #${c.id.takeLast(6).uppercase()} is now ${c.status.uppercase()}"
                                         notificationHelper.showNotification(title, msg)

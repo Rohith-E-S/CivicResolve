@@ -191,6 +191,13 @@ export const createComplaint = async (req, res) => {
       description,
       latitude,
       longitude,
+      location: {
+        type: "Point",
+        coordinates: [parseFloat(longitude) || 0, parseFloat(latitude) || 0],
+      },
+      timestamps: {
+        reported: new Date(),
+      },
       city,
       state,
       landmark,
@@ -290,8 +297,12 @@ export const getAllComplaints = async (req, res) => {
       (complaint) => complaint.status === "new"
     );
 
+    const underReviewComplaint = complaints.filter(
+      (complaint) => complaint.status === "under_review"
+    );
+
     const inProgressComplaint = complaints.filter(
-      (complaint) => complaint.status === "in progress"
+      (complaint) => complaint.status === "in_progress"
     );
 
     const resolvedComplaint = complaints.filter(
@@ -301,7 +312,12 @@ export const getAllComplaints = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Fetch all the complaints",
-      complaints: { newComplaint, inProgressComplaint, resolvedComplaint },
+      complaints: {
+        newComplaint,
+        underReviewComplaint,
+        inProgressComplaint,
+        resolvedComplaint,
+      },
     });
   } catch (error) {
     console.log(error.message);
@@ -429,12 +445,14 @@ export const updateComplaintStatus = async (req, res) => {
     }
 
     const complaintId = req.params.id;
-    const { status } = req.body;
+    const { status } = req.body; // "under_review" | "in_progress" | "resolved"
 
-    if (!["new", "in progress", "resolved"].includes(status)) {
+    console.log("[updateComplaintStatus] email:", req.user?.email, "isAdmin:", req.user?.isAdmin, "status:", JSON.stringify(status), "body:", JSON.stringify(req.body));
+
+    if (!["new", "under_review", "in_progress", "resolved"].includes(status)) {
       return res
         .status(404)
-        .json({ success: false, message: "Invalid  status value" });
+        .json({ success: false, message: "Invalid status value" });
     }
 
     const complaint = await Complaint.findOne({
@@ -448,6 +466,8 @@ export const updateComplaintStatus = async (req, res) => {
         .json({ success: false, message: "Complaint not found" });
     }
 
+    const oldStatus = complaint.status;
+
     if (status === "resolved" && !complaint.afterImageUrl) {
       return res.status(400).json({
         success: false,
@@ -455,24 +475,37 @@ export const updateComplaintStatus = async (req, res) => {
       });
     }
 
-    const updateComplaint = await Complaint.findOneAndUpdate(
-      { _id: complaintId, ...ACTIVE_COMPLAINT_QUERY },
-      { status },
-      { new: true }
-    );
+    // Map status string -> timestamps field
+    const timestampMap = {
+      under_review: "underReview",
+      in_progress: "inProgress",
+      resolved: "resolved",
+    };
+    const tsField = timestampMap[status];
+
+    // Update status + record timestamp
+    complaint.status = status;
+    if (!complaint.timestamps) complaint.timestamps = {};
+    if (tsField && !complaint.timestamps[tsField]) {
+      complaint.timestamps[tsField] = new Date();
+    }
+    await complaint.save();
+
+    // Return populated complaint so Android gets user object
+    const populatedComplaint = await Complaint.findById(complaintId).populate("user");
 
     // Socket broadcasting logic
     const io = req.app.get("io");
     if (io) {
       if (status === "resolved") {
         io.emit("globalToast", {
-          message: `Success! An issue in ${updateComplaint.city} has been resolved!`,
-          type: "success"
+          message: `Success! An issue in ${complaint.city} has been resolved!`,
+          type: "success",
         });
       }
       io.to(complaintId).emit("statusUpdated", {
         complaintId,
-        status: status.toUpperCase()
+        status: status.toUpperCase(),
       });
     }
 
@@ -480,15 +513,15 @@ export const updateComplaintStatus = async (req, res) => {
     await notifyStatusChanged(io, {
       complaintOwnerId: complaint.user,
       complaintId,
-      oldStatus: complaint.status,
+      oldStatus,
       newStatus: status,
-      category:  complaint.category,
+      category: complaint.category,
     });
 
     res.status(201).json({
       success: true,
       message: "Complaint status updated",
-      updateComplaint,
+      complaint: populatedComplaint,
     });
   } catch (error) {
     console.log(error.message);
@@ -573,7 +606,7 @@ export const updateAfterImageUrl = async (req, res) => {
     notifyStatusChanged(io, {
       complaintOwnerId: complaint.user,
       complaintId,
-      oldStatus: "in progress",
+      oldStatus: "in_progress",
       newStatus: "resolved",
       category:  complaint.category,
     }).catch(err => console.error("Notification failed:", err.message));
@@ -620,7 +653,7 @@ export const updateComplaint = async (req, res) => {
     // Validate status (if provided)
     if (
       status &&
-      !["new", "in progress", "resolved"].includes(status.toLowerCase())
+      !["new", "in_progress", "resolved"].includes(status.toLowerCase())
     ) {
       return res.status(400).json({
         success: false,
@@ -831,7 +864,7 @@ export const getComplaintStats = async (req, res) => {
 
     const newComplaint = complaints.filter((c) => c.status === "new");
     const inProgressComplaint = complaints.filter(
-      (c) => c.status === "in progress"
+      (c) => c.status === "in_progress"
     );
     const resolvedComplaint = complaints.filter((c) => c.status === "resolved");
 
@@ -929,7 +962,7 @@ export const getMyComplaintStats = async (req, res) => {
     });
 
     const newComplaint = complaints.filter((c) => c.status === "new");
-    const inProgressComplaint = complaints.filter((c) => c.status === "in progress");
+    const inProgressComplaint = complaints.filter((c) => c.status === "in_progress");
     const resolvedComplaint = complaints.filter((c) => c.status === "resolved");
 
     res.status(200).json({
@@ -1199,93 +1232,63 @@ export const deleteMyComplaint = async (req, res) => {
   }
 };
 
-// Nearby complaint discovery
+// Nearby complaint discovery (Geospatial)
 export const getNearbyComplaints = async (req, res) => {
   try {
-    const latitude = Number.parseFloat(req.query.lat);
-    const longitude = Number.parseFloat(req.query.lng);
-    const radius = Number.parseFloat(req.query.radius || "3");
-    const limit = Math.min(Number.parseInt(req.query.limit || "20", 10), 100);
+    const lat = parseFloat(req.query.lat);
+    const lng = parseFloat(req.query.lng);
+    const radius = Math.min(parseInt(req.query.radius) || 500, 2000);
 
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      return res.status(400).json({
-        success: false,
-        message: "lat and lng query params are required and must be valid numbers",
-      });
+    if (isNaN(lat) || isNaN(lng)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid coordinates" });
     }
 
-    if (!Number.isFinite(radius) || radius <= 0 || radius > 50) {
-      return res.status(400).json({
-        success: false,
-        message: "radius must be a number between 0 and 50 (km)",
-      });
-    }
-
-    if (!Number.isInteger(limit) || limit <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "limit must be a positive integer",
-      });
-    }
-
-    const query = { ...ACTIVE_COMPLAINT_QUERY };
-    if (req.query.status && req.query.status !== "all") {
-      query.status = req.query.status;
-    }
-    if (req.query.category && req.query.category !== "all") {
-      query.category = req.query.category;
-    }
-
-    const complaints = await Complaint.find(query)
-      .sort({ createdAt: -1 })
-      .limit(500)
-      .populate("user", "fullName profilePic");
-
-    const nearbyComplaints = complaints
-      .map((complaint) => {
-        const complaintLat = Number.parseFloat(complaint.latitude);
-        const complaintLng = Number.parseFloat(complaint.longitude);
-
-        if (!Number.isFinite(complaintLat) || !Number.isFinite(complaintLng)) {
-          return null;
-        }
-
-        const distanceKm = haversineDistanceKm(
-          latitude,
-          longitude,
-          complaintLat,
-          complaintLng
-        );
-
-        if (distanceKm > radius) {
-          return null;
-        }
-
-        const obj = complaint.toObject();
-        return {
-          ...obj,
-          distanceKm: Number(distanceKm.toFixed(2)),
-        };
-      })
-      .filter(Boolean)
-      .sort((a, b) => a.distanceKm - b.distanceKm)
-      .slice(0, limit);
-
-    return res.status(200).json({
-      success: true,
-      complaints: nearbyComplaints,
-      meta: {
-        radiusKm: radius,
-        count: nearbyComplaints.length,
+    const complaints = await Complaint.find({
+      location: {
+        $nearSphere: {
+          $geometry: {
+            type: "Point",
+            coordinates: [lng, lat], // GeoJSON: [longitude, latitude]
+          },
+          $maxDistance: radius, // in meters
+        },
       },
+      status: { $ne: "resolved" }, // only show active issues
+    })
+      .select("category description location status timestamps createdAt")
+      .limit(10)
+      .lean();
+
+    // Calculate distance for each complaint (haversine formula)
+    const withDistance = complaints.map((c) => {
+      const [cLng, cLat] = c.location.coordinates;
+      const distMeters = haversineDistance(lat, lng, cLat, cLng);
+      return { ...c, distanceMeters: Math.round(distMeters) };
     });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: `Error fetching nearby complaints: ${error.message}`,
+
+    res.json({
+      success: true,
+      count: withDistance.length,
+      complaints: withDistance,
     });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// ── Haversine distance formula (meters) ──────────────────────────────────────
+function haversineDistance(lat1, lng1, lat2, lng2) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const R = 6371000; // Earth radius in meters
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 // Support/upvote a complaint to signal duplicate impact
 export const supportComplaint = async (req, res) => {
@@ -1426,7 +1429,7 @@ export const getPublicStats = async (req, res) => {
 
     const totalActive = await Complaint.countDocuments({
       ...query,
-      status: { $in: ["new", "in progress"] },
+      status: { $in: ["new", "in_progress"] },
     });
 
     res.status(200).json({

@@ -1,6 +1,10 @@
 package com.example.complaintportal.ui.screens.user
 
 import com.example.complaintportal.ui.screens.*
+import com.example.complaintportal.ui.screens.SortOption
+import com.example.complaintportal.ui.screens.BeyondRadiusBanner
+import com.example.complaintportal.ui.screens.haversineDistance
+import com.example.complaintportal.data.model.Complaint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -75,6 +79,10 @@ fun UserDashboardScreen(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var isUpdatingLocation by remember { mutableStateOf(false) }
 
+    var userLat by rememberSaveable { mutableStateOf<Double?>(null) }
+    var userLng by rememberSaveable { mutableStateOf<Double?>(null) }
+    var showAllBeyond by rememberSaveable { mutableStateOf(false) }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -83,7 +91,11 @@ fun UserDashboardScreen(
         if (granted) {
             scope.launch {
                 isUpdatingLocation = true
-                detectLocation(context, fusedLocationClient) { _, detectedDistrict ->
+                detectLocation(context, fusedLocationClient) { _, detectedDistrict, lat, lng ->
+                    if (lat != null && lng != null) {
+                        userLat = lat
+                        userLng = lng
+                    }
                     if (detectedDistrict != null) {
                         authViewModel.completeOnboarding(detectedDistrict) {
                             scope.launch {
@@ -126,7 +138,11 @@ fun UserDashboardScreen(
         if (hasLocationPermission) {
             scope.launch {
                 isUpdatingLocation = true
-                detectLocation(context, fusedLocationClient) { _, detectedDistrict ->
+                detectLocation(context, fusedLocationClient) { _, detectedDistrict, lat, lng ->
+                    if (lat != null && lng != null) {
+                        userLat = lat
+                        userLng = lng
+                    }
                     if (detectedDistrict != null && detectedDistrict != district) {
                         authViewModel.completeOnboarding(detectedDistrict) {
                             scope.launch {
@@ -418,101 +434,11 @@ fun UserDashboardScreen(
                     }
                 )
 
-                Surface(
-                    onClick = { showSortMenu = true },
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                    shadowElevation = 2.dp,
-                    modifier = Modifier.size(46.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Rounded.FilterList,
-                            contentDescription = stringResource(R.string.filter_sort),
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = showSortMenu,
-                        onDismissRequest = { showSortMenu = false },
-                        shape = RoundedCornerShape(16.dp),
-                        shadowElevation = 8.dp,
-                        tonalElevation = 8.dp,
-                        modifier = Modifier.width(220.dp).background(MaterialTheme.colorScheme.surface)
-                    ) {
-                        Text(
-                            "Sort & Filter",
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        
-                        DropdownMenuItem(
-                            text = { 
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    Text(stringResource(R.string.newest_first), fontWeight = if (sortOption == SortOption.DATE_DESC) FontWeight.Bold else FontWeight.Medium)
-                                    if (sortOption == SortOption.DATE_DESC) {
-                                        Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                                    }
-                                }
-                            },
-                            onClick = { sortOption = SortOption.DATE_DESC; showSortMenu = false },
-                            modifier = Modifier
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (sortOption == SortOption.DATE_DESC) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent)
-                        )
-                        DropdownMenuItem(
-                            text = { 
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    Text(stringResource(R.string.oldest_first), fontWeight = if (sortOption == SortOption.DATE_ASC) FontWeight.Bold else FontWeight.Medium)
-                                    if (sortOption == SortOption.DATE_ASC) {
-                                        Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                                    }
-                                }
-                            },
-                            onClick = { sortOption = SortOption.DATE_ASC; showSortMenu = false },
-                            modifier = Modifier
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (sortOption == SortOption.DATE_ASC) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent)
-                        )
-                        DropdownMenuItem(
-                            text = { 
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    Text(stringResource(R.string.highest_rated), fontWeight = if (sortOption == SortOption.RATING_DESC) FontWeight.Bold else FontWeight.Medium)
-                                    if (sortOption == SortOption.RATING_DESC) {
-                                        Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                                    }
-                                }
-                            },
-                            onClick = { sortOption = SortOption.RATING_DESC; showSortMenu = false },
-                            modifier = Modifier
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (sortOption == SortOption.RATING_DESC) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent)
-                        )
-                        DropdownMenuItem(
-                            text = { 
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    Text(stringResource(R.string.most_upvotes), fontWeight = if (sortOption == SortOption.UPVOTES_DESC) FontWeight.Bold else FontWeight.Medium)
-                                    if (sortOption == SortOption.UPVOTES_DESC) {
-                                        Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                                    }
-                                }
-                            },
-                            onClick = { sortOption = SortOption.UPVOTES_DESC; showSortMenu = false },
-                            modifier = Modifier
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (sortOption == SortOption.UPVOTES_DESC) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent)
-                        )
-                    }
-                }
+                SortFilterDropdown(
+                    selectedSort = sortOption,
+                    activeTab = if (selectedTab == 1 && communityTabScope == 0) 0 else 1,
+                    onSortChanged = { sortOption = it }
+                )
 
                 IconButton(
                     onClick = { isMapView = !isMapView },
@@ -598,7 +524,7 @@ fun UserDashboardScreen(
                 )
             } else {
                 val newCount = if (selectedTab == 0) state.newComplaints.size else state.communityComplaints.count { it.status.lowercase() == "new" }
-                val activeCount = if (selectedTab == 0) state.inProgressComplaints.size else state.communityComplaints.count { it.status.lowercase() == "in progress" }
+                val activeCount = if (selectedTab == 0) state.inProgressComplaints.size else state.communityComplaints.count { it.status.lowercase() == "in_progress" }
                 val resolvedCount = if (selectedTab == 0) state.resolvedComplaints.size else state.communityComplaints.count { it.status.lowercase() == "resolved" }
 
                 LazyRow(
@@ -654,11 +580,18 @@ fun UserDashboardScreen(
                             2 -> state.resolvedComplaints
                             else -> emptyList()
                         }
+            
+            LaunchedEffect(selectedTab, communityTabScope) {
+                if (selectedTab == 1 && communityTabScope == 1 && sortOption == SortOption.NEAREST) {
+                    sortOption = SortOption.DATE_DESC
+                }
+                showAllBeyond = false
+            }
                         
                         val displayList = if (selectedTab == 0) list else {
                             val status = when (page) {
                                 0 -> "new"
-                                1 -> "in progress"
+                                1 -> "in_progress"
                                 2 -> "resolved"
                                 else -> "all"
                             }
@@ -681,8 +614,9 @@ fun UserDashboardScreen(
                                             .padding(4.dp),
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
+                                        val navyColor = Color(0xFF1A3A6E)
+                                        val activeColor = navyColor
                                         val inactiveColor = Color.Transparent
-                                        val activeColor = MaterialTheme.colorScheme.surface
 
                                         Box(
                                             modifier = Modifier
@@ -690,6 +624,7 @@ fun UserDashboardScreen(
                                                 .fillMaxHeight()
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .background(if (communityTabScope == 0) activeColor else inactiveColor)
+                                                .then(if (communityTabScope != 0) Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)) else Modifier)
                                                 .clickable { communityTabScope = 0 },
                                             contentAlignment = Alignment.Center
                                         ) {
@@ -698,14 +633,14 @@ fun UserDashboardScreen(
                                                     Icons.Default.LocationOn, 
                                                     contentDescription = null, 
                                                     modifier = Modifier.size(16.dp),
-                                                    tint = if (communityTabScope == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                                    tint = if (communityTabScope == 0) Color.White else MaterialTheme.colorScheme.outline
                                                 )
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text(
                                                     if (district != null) "My District" else "Local", 
                                                     style = MaterialTheme.typography.labelLarge,
                                                     fontWeight = if (communityTabScope == 0) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (communityTabScope == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                                    color = if (communityTabScope == 0) Color.White else MaterialTheme.colorScheme.outline
                                                 )
                                             }
                                         }
@@ -716,6 +651,7 @@ fun UserDashboardScreen(
                                                 .fillMaxHeight()
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .background(if (communityTabScope == 1) activeColor else inactiveColor)
+                                                .then(if (communityTabScope != 1) Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)) else Modifier)
                                                 .clickable { communityTabScope = 1 },
                                             contentAlignment = Alignment.Center
                                         ) {
@@ -724,14 +660,14 @@ fun UserDashboardScreen(
                                                     Icons.Default.Public, 
                                                     contentDescription = null, 
                                                     modifier = Modifier.size(16.dp),
-                                                    tint = if (communityTabScope == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                                    tint = if (communityTabScope == 1) Color.White else MaterialTheme.colorScheme.outline
                                                 )
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text(
                                                     "Global Feed", 
                                                     style = MaterialTheme.typography.labelLarge,
                                                     fontWeight = if (communityTabScope == 1) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (communityTabScope == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                                    color = if (communityTabScope == 1) Color.White else MaterialTheme.colorScheme.outline
                                                 )
                                             }
                                         }
@@ -751,7 +687,7 @@ fun UserDashboardScreen(
                                     )
                                 }
                             ) {
-                                val filteredList = if (searchQuery.isBlank()) {
+                                val filteredList: List<Complaint> = if (searchQuery.isBlank()) {
                                     displayList
                                 } else {
                                     displayList.filter {
@@ -765,8 +701,32 @@ fun UserDashboardScreen(
                                         SortOption.DATE_ASC -> unsorted.sortedBy { it.createdAt }
                                         SortOption.RATING_DESC -> unsorted.sortedByDescending { it.rating }
                                         SortOption.UPVOTES_DESC -> unsorted.sortedByDescending { it.supportCount ?: 0 }
+                                        SortOption.NEAREST -> {
+                                            val mapped: List<Pair<Complaint, Double>> = unsorted.map { complaint ->
+                                                val lat = complaint.latitude.toDoubleOrNull() ?: 0.0
+                                                val lng = complaint.longitude.toDoubleOrNull() ?: 0.0
+                                                val uLat = userLat ?: 0.0
+                                                val uLng = userLng ?: 0.0
+                                                val dist = haversineDistance(uLat, uLng, lat, lng)
+                                                Pair(complaint, dist)
+                                            }
+                                            val sorted = mapped.sortedBy { it.second }
+                                            if (showAllBeyond || userLat == null) {
+                                                sorted.map { it.first }
+                                            } else {
+                                                sorted.filter { it.second <= 5000.0 }.map { it.first }
+                                            }
+                                        }
                                     }
                                 }
+
+                                val hiddenBeyondRadius = if (sortOption == SortOption.NEAREST && !showAllBeyond && userLat != null) {
+                                    displayList.count { complaint ->
+                                        val lat = complaint.latitude.toDoubleOrNull() ?: 0.0
+                                        val lng = complaint.longitude.toDoubleOrNull() ?: 0.0
+                                        haversineDistance(userLat ?: 0.0, userLng ?: 0.0, lat, lng) > 5000.0
+                                    }
+                                } else 0
 
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
@@ -784,7 +744,14 @@ fun UserDashboardScreen(
                                                     modifier = Modifier.size(120.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer.copy(alpha=0.2f)),
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+                                                    if (selectedTab == 1) {
+                                                        Box(contentAlignment = Alignment.TopCenter) {
+                                                            Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
+                                                            Icon(Icons.Default.People, contentDescription = null, modifier = Modifier.size(28.dp).padding(top=10.dp), tint = MaterialTheme.colorScheme.surface)
+                                                        }
+                                                    } else {
+                                                        Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+                                                    }
                                                 }
                                                 Spacer(modifier = Modifier.height(24.dp))
                                                 Text(stringResource(R.string.you_re_all_caught_up), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -820,13 +787,28 @@ fun UserDashboardScreen(
                                                     isOwner = complaint.user?.id == userId,
                                                     onSupportClick = {
                                                         if (selectedTab == 1) {
-                                                            viewModel.supportComplaint(complaint.id) {
-                                                                // Optional: refresh specific lists or just rely on state sync
-                                                            }
+                                                            viewModel.supportComplaint(complaint.id) {}
                                                         }
-                                                    }
+                                                    },
+                                                    distanceMeters = if (userLat != null && userLng != null) {
+                                                        val lat = complaint.latitude.toDoubleOrNull() ?: 0.0
+                                                        val lng = complaint.longitude.toDoubleOrNull() ?: 0.0
+                                                        haversineDistance(userLat!!, userLng!!, lat, lng)
+                                                    } else null,
+                                                    showDistance = selectedTab == 1 && district != null && (
+                                                        complaint.city.contains(district, ignoreCase = true) || 
+                                                        district.contains(complaint.city, ignoreCase = true)
+                                                    ),
+                                                    currentUserId = userId
                                                 )
                                             }
+                                        }
+
+                                        item {
+                                            BeyondRadiusBanner(
+                                                hiddenCount = hiddenBeyondRadius,
+                                                onShowAll = { showAllBeyond = true }
+                                            )
                                         }
 
                                         item {

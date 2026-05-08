@@ -89,11 +89,18 @@ fun AdminComplaintDetailScreen(
     }
 
     val complaint = state.currentComplaint
-    var showStatusDialog by remember { mutableStateOf(false) }
-    var selectedStatus by remember { mutableStateOf("") }
     var showZoomDialog by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Show errors from ViewModel
+    LaunchedEffect(state.error) {
+        state.error?.let {
+            snackbarHostState.showSnackbar(it)
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 navigationIcon = {
@@ -255,10 +262,11 @@ fun AdminComplaintDetailScreen(
                         Text(stringResource(R.string.administrative_actions), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
                         Spacer(modifier = Modifier.height(16.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            if (complaint.status.lowercase() == "new") {
+                            val statusLower = complaint.status.lowercase()
+                            if (statusLower == "new" || statusLower == "under_review") {
                                 Button(
                                     onClick = { 
-                                        viewModel.updateComplaintStatus(complaintId, "in progress") {
+                                        viewModel.updateComplaintStatus(complaintId, "in_progress") {
                                             viewModel.fetchComplaint(complaintId, userId)
                                             viewModel.fetchAdminComplaints(userId)
                                         }
@@ -272,9 +280,10 @@ fun AdminComplaintDetailScreen(
                                 Button(
                                     onClick = {},
                                     modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(12.dp),
+                                    enabled = false
                                 ) {
-                                    Text(stringResource(R.string.in_process))
+                                    Text(if (statusLower == "resolved") stringResource(R.string.resolved) else stringResource(R.string.in_process))
                                 }
                             }
                             Spacer(modifier = Modifier.width(16.dp))

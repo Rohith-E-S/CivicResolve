@@ -120,7 +120,10 @@ fun ComplaintCard(
     showCommunityFeatures: Boolean = false,
     isSupported: Boolean = false,
     isOwner: Boolean = false,
-    onSupportClick: () -> Unit = {}
+    onSupportClick: () -> Unit = {},
+    distanceMeters: Double? = null,
+    showDistance: Boolean = false,
+    currentUserId: String? = null
 ) {
     val sharedTransitionScope = com.example.complaintportal.ui.navigation.LocalSharedTransitionScope.current
     val animatedVisibilityScope = com.example.complaintportal.ui.navigation.LocalNavAnimatedVisibilityScope.current
@@ -176,12 +179,12 @@ fun ComplaintCard(
                 val statusClean = complaint.status.trim().lowercase()
                 val statusColor = when (statusClean) {
                     "resolved" -> MaterialTheme.colorScheme.secondaryContainer
-                    "in progress" -> MaterialTheme.colorScheme.tertiaryContainer
+                    "in_progress" -> MaterialTheme.colorScheme.tertiaryContainer
                     else -> MaterialTheme.colorScheme.primaryContainer
                 }
                 val onStatusColor = when (statusClean) {
                     "resolved" -> MaterialTheme.colorScheme.onSecondaryContainer
-                    "in progress" -> MaterialTheme.colorScheme.onTertiaryContainer
+                    "in_progress" -> MaterialTheme.colorScheme.onTertiaryContainer
                     else -> MaterialTheme.colorScheme.onPrimaryContainer
                 }
 
@@ -213,14 +216,20 @@ fun ComplaintCard(
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        if (showCommunityFeatures) {
-                            Text(
-                                text = stringResource(R.string.citizen_in, complaint.city.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha=0.7f),
-                                modifier = Modifier.padding(bottom = 2.dp)
-                            )
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            if (showCommunityFeatures) {
+                                if (currentUserId != null && complaint.user?.id == currentUserId) {
+                                    YouReportedBadge()
+                                } else {
+                                    Text(
+                                        text = stringResource(R.string.citizen_in, complaint.city.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha=0.7f),
+                                        modifier = Modifier.padding(bottom = 2.dp)
+                                    )
+                                }
+                            }
                         }
                         Text(
                             text = complaint.category.replace("_", " ").replaceFirstChar { it.uppercase() },
@@ -263,28 +272,10 @@ fun ComplaintCard(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            if (showCommunityFeatures) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier
-                                            .background(androidx.compose.ui.graphics.Color(0xFF7ECFC0).copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.LocationOn,
-                                            contentDescription = null,
-                                            tint = androidx.compose.ui.graphics.Color(0xFF7ECFC0),
-                                            modifier = Modifier.size(10.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(2.dp))
-                                        Text(
-                                            text = stringResource(R.string.m_away, (100..900).random()),
-                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = androidx.compose.ui.graphics.Color(0xFF7ECFC0)
-                                        )
-                                    }
-                            }
+                            ComplaintDistanceLabel(
+                                distanceMeters = distanceMeters,
+                                showDistance = showDistance
+                            )
                         }
                         
                         val dateDisplay = try {
@@ -393,8 +384,12 @@ fun CustomPullToRefreshIndicator(
     }
 }
 
-enum class SortOption {
-    DATE_DESC, DATE_ASC, RATING_DESC, UPVOTES_DESC
+enum class SortOption(val label: String) {
+    DATE_DESC("Newest First"),
+    DATE_ASC("Oldest First"),
+    RATING_DESC("Highest Rated"),
+    UPVOTES_DESC("Most Upvotes"),
+    NEAREST("📍 Nearest First")
 }
 
 @Composable
@@ -646,4 +641,262 @@ private fun StatBarDivider() {
             .height(24.dp)
             .background(MaterialTheme.colorScheme.outlineVariant)
     )
+}
+
+// ── Haversine distance (meters) ───────────────────────────────────────────────
+fun haversineDistance(
+    lat1: Double, lng1: Double,
+    lat2: Double, lng2: Double,
+): Double {
+    val R    = 6371000.0
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLng = Math.toRadians(lng2 - lng1)
+    val sinDLat2 = kotlin.math.sin(dLat / 2)
+    val sinDLng2 = kotlin.math.sin(dLng / 2)
+    val a    = sinDLat2 * sinDLat2 +
+               kotlin.math.cos(Math.toRadians(lat1)) *
+               kotlin.math.cos(Math.toRadians(lat2)) *
+               sinDLng2 * sinDLng2
+    return R * 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+}
+
+// ── Distance label + color helpers ───────────────────────────────────────────
+fun distanceLabel(meters: Double): String = when {
+    meters < 1000 -> "${meters.toInt()}m away"
+    else          -> "${"%.1f".format(meters / 1000)}km away"
+}
+
+fun distanceColor(meters: Double): Color = when {
+    meters <= 1000.0 -> Color(0xFF2E7D32) // <= 1km: Green
+    meters <= 5000.0 -> Color(0xFFE67E22) // <= 5km: Orange
+    else -> Color(0xFFE53935)             // > 5km: Red
+}
+
+// ── Sort dropdown ─────────────────────────────────────────────────────────────
+@Composable
+fun SortFilterDropdown(
+    selectedSort:  SortOption,
+    activeTab:     Int,
+    onSortChanged: (SortOption) -> Unit,
+    modifier:      Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    // Available options based on active tab
+    val availableOptions = remember(activeTab) {
+        buildList {
+            add(SortOption.DATE_DESC)
+            add(SortOption.DATE_ASC)
+            add(SortOption.RATING_DESC)
+            add(SortOption.UPVOTES_DESC)
+            // Nearest ONLY in My District (0)
+            if (activeTab == 0) {
+                add(SortOption.NEAREST)
+            }
+        }
+    }
+
+    Box(modifier = modifier) {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .size(46.dp)
+                .clip(CircleShape)
+                .background(
+                    if (selectedSort != SortOption.DATE_DESC)
+                        Color(0xFF1A3A6E).copy(alpha = 0.12f)
+                    else
+                        Color(0xFF1A3A6E).copy(alpha = 0.08f)
+                ),
+        ) {
+            Icon(
+                Icons.Default.FilterList,
+                contentDescription = "Sort",
+                tint = Color(0xFF1A3A6E),
+            )
+            if (selectedSort != SortOption.DATE_DESC) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 2.dp, y = (-2).dp)
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF1A3A6E))
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded         = expanded,
+            onDismissRequest = { expanded = false },
+            modifier         = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFFFFFFFF))
+                .width(220.dp),
+        ) {
+            Text(
+                "Sort & Filter",
+                fontSize   = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color      = Color(0xFF6A7F9A),
+                modifier   = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            )
+
+            HorizontalDivider(color = Color(0xFFE8EDF5), thickness = 0.5.dp)
+
+            availableOptions.forEach { option ->
+                val isSelected = selectedSort == option
+                DropdownMenuItem(
+                    text = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                option.label,
+                                fontSize   = 14.sp,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                color      = if (isSelected) Color(0xFF1A3A6E) else Color(0xFF0D2247),
+                            )
+                            if (isSelected) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint     = Color(0xFF1A3A6E),
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
+                    },
+                    onClick = {
+                        onSortChanged(option)
+                        expanded = false
+                    },
+                    modifier = Modifier.background(
+                        if (isSelected) Color(0xFF1A3A6E).copy(alpha = 0.05f) else Color.Transparent
+                    ),
+                )
+
+                if (option == SortOption.UPVOTES_DESC && activeTab == 0) {
+                    HorizontalDivider(
+                        color     = Color(0xFFE8EDF5),
+                        thickness = 0.5.dp,
+                        modifier  = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ── Distance label composable — for complaint cards ───────────────────────────
+@Composable
+fun ComplaintDistanceLabel(
+    distanceMeters: Double?,
+    showDistance:   Boolean,
+    modifier:       Modifier = Modifier,
+) {
+    if (!showDistance || distanceMeters == null) return
+
+    val color = distanceColor(distanceMeters)
+    val label = distanceLabel(distanceMeters)
+
+    Row(
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        modifier              = modifier,
+    ) {
+        Icon(
+            Icons.Default.LocationOn,
+            contentDescription = null,
+            tint     = color,
+            modifier = Modifier.size(12.dp),
+        )
+        Text(
+            text       = label,
+            fontSize   = 11.sp,
+            color      = color,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+// ── "You reported this" badge ─────────────────────────────────────────────────
+@Composable
+fun YouReportedBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0xFF7ECFC0).copy(alpha = 0.15f))
+            .border(0.5.dp, Color(0xFF7ECFC0).copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                "🏷️",
+                fontSize = 10.sp
+            )
+            Text(
+                "You reported this",
+                fontSize   = 10.sp,
+                color      = Color(0xFF0D6E5A),
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+// ── "Beyond 5km" footer banner ────────────────────────────────────────────────
+@Composable
+fun BeyondRadiusBanner(
+    hiddenCount: Int,
+    onShowAll:   () -> Unit,
+    modifier:    Modifier = Modifier,
+) {
+    if (hiddenCount <= 0) return
+
+    Column(
+        modifier            = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        HorizontalDivider(color = Color(0xFFE8EDF5))
+
+        Row(
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                Icons.Rounded.Warning,
+                contentDescription = null,
+                tint     = Color(0xFFE67E22),
+                modifier = Modifier.size(14.dp),
+            )
+            Text(
+                "$hiddenCount more issue${if (hiddenCount > 1) "s" else ""} beyond 5km",
+                fontSize = 12.sp,
+                color    = Color(0xFF6A7F9A),
+            )
+        }
+
+        OutlinedButton(
+            onClick  = onShowAll,
+            shape    = RoundedCornerShape(20.dp),
+            border   = BorderStroke(1.dp, Color(0xFF1A3A6E)),
+            modifier = Modifier.height(36.dp),
+        ) {
+            Text(
+                "Show all in district",
+                fontSize = 12.sp,
+                color    = Color(0xFF1A3A6E),
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
 }

@@ -160,7 +160,7 @@ fun OsmDashboardMap(
                     
                     val markerColor = when (complaint.status.lowercase()) {
                         "new" -> android.graphics.Color.RED
-                        "in progress" -> android.graphics.Color.parseColor("#FFB74D")
+                        "in_progress" -> android.graphics.Color.parseColor("#FFB74D")
                         "resolved" -> android.graphics.Color.parseColor("#81C784")
                         else -> android.graphics.Color.GRAY
                     }
