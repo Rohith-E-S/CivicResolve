@@ -92,11 +92,16 @@ fun CreateComplaintScreen(
     var locationMessage by rememberSaveable { mutableStateOf("") }
     var showConfetti by rememberSaveable { mutableStateOf(false) }
     var showOutOfBoundsDialog by remember { mutableStateOf(false) }
+    var showNearbyReportsDialog by remember { mutableStateOf(false) }
     var isVoiceActive by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    
+    LaunchedEffect(Unit) {
+        viewModel.clearNearbyComplaints()
+    }
 
     // --- Animation for Microphone ---
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -326,40 +331,18 @@ fun CreateComplaintScreen(
                                 return@Button
                             }
 
-                            if (selectedImageUri == null) return@Button
-                            
-                            // Save data to ViewModel for later use
-                            viewModel.setPendingComplaintData(
-                                com.example.complaintportal.ui.viewmodel.PendingComplaintData(
-                                    description = description,
-                                    lat = lat,
-                                    lng = lng,
-                                    city = city,
-                                    state = userState,
-                                    landmark = landmark,
-                                    imageUri = selectedImageUri!!
-                                )
-                            )
-
-                            // Prepare image for analysis
-                            var imagePart: MultipartBody.Part? = null
-                            try {
-                                val inputStream = context.contentResolver.openInputStream(selectedImageUri!!)
-                                val uploadFile = File(context.cacheDir, "analyze_${System.currentTimeMillis()}.jpg")
-                                val outputStream = FileOutputStream(uploadFile)
-                                inputStream?.copyTo(outputStream)
-                                inputStream?.close()
-                                outputStream.close()
-                                val requestFile = uploadFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
-                                imagePart = MultipartBody.Part.createFormData("imageUrl", uploadFile.name, requestFile)
-                                
-                                if (imagePart != null) {
-                                    viewModel.analyzeImage(imagePart)
-                                    onSuccess() // Navigates to AiAnalysisScreen
+                            // Check for nearby reports first
+                            scope.launch {
+                                viewModel.fetchNearbyComplaints(lat.toDouble(), lng.toDouble())
+                                // Give it a moment to fetch
+                                delay(800)
+                                if (viewModel.state.value.nearbyComplaints.isNotEmpty()) {
+                                    showNearbyReportsDialog = true
+                                } else {
+                                    proceedWithSubmission(
+                                        viewModel, context, selectedImageUri, description, lat, lng, city, userState, landmark, onSuccess
+                                    )
                                 }
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                                Toast.makeText(context, "Error preparing image: ${e.message}", Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -654,6 +637,19 @@ fun CreateComplaintScreen(
                 }
             }
         }
+        if (showNearbyReportsDialog) {
+            NearbyReportsDialog(
+                nearbyReports = state.nearbyComplaints,
+                onDismiss = { showNearbyReportsDialog = false },
+                onConfirm = {
+                    showNearbyReportsDialog = false
+                    proceedWithSubmission(
+                        viewModel, context, selectedImageUri, description, lat, lng, city, userState, landmark, onSuccess
+                    )
+                }
+            )
+        }
+
         if (showOutOfBoundsDialog) {
             // Determine the "current city" from reverse-geocoded fields
             val currentCity = listOf(city, userState).firstOrNull { it.isNotBlank() } ?: "your current location"
@@ -762,6 +758,112 @@ fun CreateComplaintScreen(
             )
         }
     }
+}
+
+private fun proceedWithSubmission(
+    viewModel: ComplaintViewModel,
+    context: Context,
+    selectedImageUri: Uri?,
+    description: String,
+    lat: String,
+    lng: String,
+    city: String,
+    userState: String,
+    landmark: String,
+    onSuccess: () -> Unit
+) {
+    if (selectedImageUri == null) return
+    
+    viewModel.setPendingComplaintData(
+        com.example.complaintportal.ui.viewmodel.PendingComplaintData(
+            description = description,
+            lat = lat,
+            lng = lng,
+            city = city,
+            state = userState,
+            landmark = landmark,
+            imageUri = selectedImageUri
+        )
+    )
+
+    // Prepare image for analysis
+    var imagePart: MultipartBody.Part? = null
+    try {
+        val inputStream = context.contentResolver.openInputStream(selectedImageUri)
+        val uploadFile = File(context.cacheDir, "analyze_${System.currentTimeMillis()}.jpg")
+        val outputStream = FileOutputStream(uploadFile)
+        inputStream?.copyTo(outputStream)
+        inputStream?.close()
+        outputStream.close()
+        val requestFile = uploadFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
+        imagePart = MultipartBody.Part.createFormData("imageUrl", uploadFile.name, requestFile)
+        
+        if (imagePart != null) {
+            viewModel.analyzeImage(imagePart)
+            onSuccess() // Navigates to AiAnalysisScreen
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        Toast.makeText(context, "Error preparing image: ${e.message}", Toast.LENGTH_SHORT).show()
+    }
+}
+
+@Composable
+fun NearbyReportsDialog(
+    nearbyReports: List<com.example.complaintportal.data.model.NearbyComplaint>,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Nearby Reports Found", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column {
+                Text("We found ${nearbyReports.size} reports near your location. It might be the same issue:", style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(12.dp))
+                androidx.compose.foundation.lazy.LazyColumn(
+                    modifier = Modifier.heightIn(max = 200.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(nearbyReports.size) { index ->
+                        val report = nearbyReports[index]
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                    Text(report.category.replace("_", " ").uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    Text("${report.distanceMeters}m away", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Text(report.description, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Is your report unique?", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text("Submit Anyway")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        shape = RoundedCornerShape(28.dp)
+    )
 }
 
 @Composable

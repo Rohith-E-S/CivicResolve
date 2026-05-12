@@ -339,6 +339,10 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
             }
         }
     }
+
+    fun clearNearbyComplaints() {
+        _state.value = _state.value.copy(nearbyComplaints = emptyList())
+    }
 }
 
 class ComplaintViewModelFactory(private val repository: ComplaintRepository) : ViewModelProvider.Factory {

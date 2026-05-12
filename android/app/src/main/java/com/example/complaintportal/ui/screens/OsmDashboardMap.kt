@@ -60,10 +60,8 @@ fun OsmDashboardMap(
     var selectedComplaint by remember { mutableStateOf<Complaint?>(null) }
     val sheetState = rememberModalBottomSheetState()
     
-    // Non-reactive flag: won't trigger recomposition when set, but persists across recompositions
-    val centered = remember { booleanArrayOf(false) }
-    // Track last scope to detect tab switches
-    val lastScope = remember { arrayOf(scope) }
+    // Track which scope the map has been centered for
+    val centeredScope = remember { arrayOf<MapScope?>(null) }
 
     // CartoDB Voyager — reliable OSM-based tiles, no blocking policy, no API key needed
     val cartoTiles = remember {
@@ -146,7 +144,7 @@ fun OsmDashboardMap(
                     val lat = it.latitude.toDoubleOrNull()
                     val lng = it.longitude.toDoubleOrNull()
                     lat != null && lng != null && 
-                    lat in 6.0..38.0 && lng in 68.0..98.0
+                    lat in 29.5..32.5 && lng in 73.5..77.0
                 }
 
                 validComplaints.forEach { complaint ->
@@ -176,29 +174,19 @@ fun OsmDashboardMap(
                     mv.overlays.add(marker)
                 }
 
-                // Center on data centroid once complaints arrive (non-reactive flag avoids recomposition loop)
-                if (!centered[0] && validComplaints.isNotEmpty()) {
+                // Re-center and re-zoom whenever the SCOPE changes and we have data
+                if (centeredScope[0] != scope && validComplaints.isNotEmpty()) {
                     val centerLat = validComplaints.map { it.latitude.toDouble() }.average()
                     val centerLng = validComplaints.map { it.longitude.toDouble() }.average()
+                    
                     val targetZoom = when (scope) {
                         MapScope.MY_REPORTS -> 13.0
                         MapScope.MY_DISTRICT -> 13.5
-                        MapScope.GLOBAL_FEED -> 11.5
+                        MapScope.GLOBAL_FEED -> 11.0 // Slightly more zoomed out for global
                     }
-                    mv.controller.setCenter(GeoPoint(centerLat, centerLng))
-                    mv.controller.setZoom(targetZoom)
-                    centered[0] = true
-                }
-
-                // Handle scope tab switch — re-zoom without re-centering
-                if (centered[0] && lastScope[0] != scope) {
-                    val targetZoom = when (scope) {
-                        MapScope.MY_REPORTS -> 13.0
-                        MapScope.MY_DISTRICT -> 13.5
-                        MapScope.GLOBAL_FEED -> 11.5
-                    }
-                    mv.controller.zoomTo(targetZoom)
-                    lastScope[0] = scope
+                    
+                    mv.controller.animateTo(GeoPoint(centerLat, centerLng), targetZoom, 1000L)
+                    centeredScope[0] = scope
                 }
 
                 mv.invalidate()
