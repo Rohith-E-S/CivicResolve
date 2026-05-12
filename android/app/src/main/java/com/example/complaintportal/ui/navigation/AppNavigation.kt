@@ -309,7 +309,9 @@ fun AppNavigation(
                     ProfileScreen(
                         authViewModel = authViewModel,
                         complaintViewModel = complaintViewModel,
-                        onNavigateBack = { navController.popBackStack() }
+                        onNavigateBack = { navController.popBackStack() },
+                        onAnalytics = { navController.navigate(Screen.Analytics.route) },
+                        onMyReports = { navController.popBackStack() } // For now, go back to dashboard
                     )
                 }
             }

@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -119,10 +120,11 @@ fun UserDashboardScreen(
     val displayUserName = if (userName.isBlank() || userName == "User") "Himanshu Singh" else userName
     var searchQuery by remember { mutableStateOf("") }
     var showSortMenu by remember { mutableStateOf(false) }
+    var selectedFilter by rememberSaveable { mutableStateOf("All") }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) } // 0: My Reports, 1: Community Hub
     var communityTabScope by rememberSaveable { mutableIntStateOf(0) } // 0: My District, 1: Global Feed
-    
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    var isMapView by rememberSaveable { mutableStateOf(false) }
+    val NavyPrimary = Color(0xFF1A3A6E)
     val coroutineScope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
 
@@ -171,6 +173,10 @@ fun UserDashboardScreen(
             viewModel.fetchCommunityFeed(scope, userId)
             viewModel.fetchPublicStats(scope)
         } else {
+            // Reset sort if it was set to NEAREST (not supported in My Reports)
+            if (state.sortOption == SortOption.NEAREST) {
+                viewModel.updateSortOption(SortOption.DATE_DESC)
+            }
             viewModel.fetchUserComplaints(userId) // Added this
             viewModel.fetchPublicStats()
         }
@@ -315,76 +321,29 @@ fun UserDashboardScreen(
                 enter   = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
                 exit    = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically(),
             ) {
-                Column {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(stringResource(R.string.hi), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(displayUserName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
-                            Text(stringResource(R.string.str), style = MaterialTheme.typography.headlineSmall)
-                        }
-                        if (district != null) {
-                            val annotatedString = buildAnnotatedString {
-                                append("Connected to ")
-                                withStyle(SpanStyle(fontWeight = FontWeight.ExtraBold)) {
-                                    append(district)
-                                }
-                                append(" Civic Portal")
-                            }
-                            Text(
-                                text = annotatedString,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
-                    }
-
-                    Card(
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp)
-                            .clickable { onNavigateToDetail("analytics") },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                        shape = RoundedCornerShape(20.dp)
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Verified, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                        Text(stringResource(R.string.hi), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(displayUserName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+                        Text(stringResource(R.string.str), style = MaterialTheme.typography.headlineSmall)
+                    }
+                    if (district != null) {
+                        val annotatedString = buildAnnotatedString {
+                            append("Connected to ")
+                            withStyle(SpanStyle(fontWeight = FontWeight.ExtraBold)) {
+                                append(district)
                             }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                val resolvedCount = if (selectedTab == 1) state.communityResolvedCount else state.resolvedComplaints.size
-                                val scopeLabel = if (selectedTab == 1) {
-                                    if (communityTabScope == 0 && district != null) "in ${district.split(" ").first()}" else "nationwide"
-                                } else "you resolved"
-                                
-                                val bannerTitle = when (resolvedCount) {
-                                    0 -> "Report your first issue to get started!"
-                                    1 -> "1 issue resolved. Great start!"
-                                    else -> String.format("%,d issues %s 🎉", resolvedCount, scopeLabel)
-                                }
-
-                                Text(
-                                    text = bannerTitle, 
-                                    style = MaterialTheme.typography.titleSmall, 
-                                    fontWeight = FontWeight.Bold, 
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(stringResource(R.string.your_community_is_improving), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Icon(Icons.Default.ChevronRight, contentDescription = stringResource(R.string.analytics), tint = MaterialTheme.colorScheme.primary.copy(alpha=0.4f))
+                            append(" Civic Portal")
                         }
+                        Text(
+                            text = annotatedString,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
                     }
                 }
             }
@@ -435,29 +394,28 @@ fun UserDashboardScreen(
 
                 SortFilterDropdown(
                     selectedSort = state.sortOption,
-                    activeTab = if (selectedTab == 1 && communityTabScope == 0) 0 else 1,
+                    activeTab = if (selectedTab == 1) 0 else 1,
                     onSortChanged = { viewModel.updateSortOption(it) }
                 )
 
                 IconButton(
-                    onClick = onNavigateToMap,
+                    onClick = { isMapView = !isMapView },
                     modifier = Modifier
                         .size(46.dp)
                         .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            if (isMapView) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                             CircleShape
                         )
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Map,
-                        contentDescription = "View Map",
-                        tint = MaterialTheme.colorScheme.primary,
+                        imageVector = if (isMapView) Icons.Default.List else Icons.Default.Map,
+                        contentDescription = if (isMapView) "View List" else "View Map",
+                        tint = if (isMapView) Color.White else MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
-            // The Toggle: [ My Reports | Community Hub ]
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = Color.Transparent,
@@ -490,336 +448,395 @@ fun UserDashboardScreen(
             }
 
             val communityFiltered = state.communityComplaints.filter { it.user?.id != userId }
-            val newCount = if (selectedTab == 0) state.newComplaints.size else communityFiltered.count { it.status.lowercase() == "new" }
-            val activeCount = if (selectedTab == 0) state.inProgressComplaints.size else communityFiltered.count { it.status.lowercase() == "in_progress" }
-            val resolvedCount = if (selectedTab == 0) state.resolvedComplaints.size else communityFiltered.count { it.status.lowercase() == "resolved" }
-
-            LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(bottom = 16.dp, top = 8.dp)
-                ) {
-                    item {
-                        StatCard(
-                            title = "New",
-                            count = newCount.toString(),
-                            color = Color(0xFFE57373),
-                            isSelected = pagerState.currentPage == 0,
-                            onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
-                        )
-                    }
-                    item {
-                        StatCard(
-                            title = "Active",
-                            count = activeCount.toString(),
-                            color = Color(0xFFFFB74D),
-                            isSelected = pagerState.currentPage == 1,
-                            onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } }
-                        )
-                    }
-                    item {
-                        StatCard(
-                            title = "Resolved",
-                            count = resolvedCount.toString(),
-                            color = Color(0xFF81C784),
-                            isSelected = pagerState.currentPage == 2,
-                            onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } }
-                        )
-                    }
-                    item {
-                        StatCard(
-                            title = "Analytics",
-                            count = "Charts",
-                            color = MaterialTheme.colorScheme.outline,
-                            isSelected = pagerState.currentPage == 3,
-                            onClick = { onNavigateToDetail("analytics") }
-                        )
+            
+            if (isMapView) {
+                val mapBaseList = if (selectedTab == 0) {
+                    state.newComplaints + state.inProgressComplaints + state.resolvedComplaints
+                } else {
+                    state.communityComplaints
+                }
+                
+                val mapFilteredList = if (searchQuery.isBlank()) {
+                    mapBaseList
+                } else {
+                    mapBaseList.filter {
+                        it.category.contains(searchQuery, ignoreCase = true) ||
+                        it.city.contains(searchQuery, ignoreCase = true) ||
+                        it.description.contains(searchQuery, ignoreCase = true)
                     }
                 }
 
-                HorizontalPager(
-                    state = pagerState,
+                val mapScope = if (selectedTab == 0) {
+                    MapScope.MY_REPORTS
+                } else if (communityTabScope == 0) {
+                    MapScope.MY_DISTRICT
+                } else {
+                    MapScope.GLOBAL_FEED
+                }
+
+                OsmDashboardMap(
+                    complaints = mapFilteredList,
+                    onComplaintClick = onNavigateToDetail,
+                    scope = mapScope,
                     modifier = Modifier.weight(1f)
-                ) { page ->
-                    val list = when (page) {
-                            0 -> state.newComplaints
-                            1 -> state.inProgressComplaints
-                            2 -> state.resolvedComplaints
-                            else -> emptyList()
+                )
+            } else {
+                val complaints = if (selectedTab == 0) {
+                    state.newComplaints + state.inProgressComplaints + state.resolvedComplaints
+                } else {
+                    state.communityComplaints
+                }
+
+                val filteredByStatus by remember(selectedFilter, complaints) {
+                    derivedStateOf {
+                        when (selectedFilter) {
+                            "All"      -> complaints
+                            "New"      -> complaints.filter { it.status.lowercase() == "new" || it.status.lowercase() == "under_review" }
+                            "Active"   -> complaints.filter { it.status.lowercase() == "in_progress" }
+                            "Resolved" -> complaints.filter { it.status.lowercase() == "resolved" }
+                            else       -> complaints
                         }
-            
-            LaunchedEffect(selectedTab, communityTabScope) {
-                showAllBeyond = false
-            }
-                        
-                        val displayList = if (selectedTab == 0) list else {
-                            val status = when (page) {
-                                0 -> "new"
-                                1 -> "in_progress"
-                                2 -> "resolved"
-                                else -> "all"
-                            }
-                            communityFiltered.filter { 
-                                status == "all" || it.status.trim().lowercase() == status.lowercase()
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    StatusChip(
+                        label      = "All",
+                        count      = complaints.size,
+                        color      = NavyPrimary,
+                        isSelected = selectedFilter == "All",
+                        onClick    = { selectedFilter = "All" },
+                    )
+                    StatusChip(
+                        label      = "New",
+                        count      = complaints.count { it.status.lowercase() == "new" || it.status.lowercase() == "under_review" },
+                        color      = Color(0xFFE53935),
+                        isSelected = selectedFilter == "New",
+                        onClick    = { selectedFilter = "New" },
+                    )
+                    StatusChip(
+                        label      = "Active",
+                        count      = complaints.count { it.status.lowercase() == "in_progress" },
+                        color      = Color(0xFFE67E22),
+                        isSelected = selectedFilter == "Active",
+                        onClick    = { selectedFilter = "Active" },
+                    )
+                    StatusChip(
+                        label      = "Resolved",
+                        count      = complaints.count { it.status.lowercase() == "resolved" },
+                        color      = Color(0xFF1D9E75),
+                        isSelected = selectedFilter == "Resolved",
+                        onClick    = { selectedFilter = "Resolved" },
+                    )
+                }
+
+                if (selectedTab == 1) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val activeColor = NavyPrimary
+                        val inactiveColor = Color.Transparent
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (communityTabScope == 0) activeColor else inactiveColor)
+                                .then(if (communityTabScope != 0) Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)) else Modifier)
+                                .clickable { communityTabScope = 0 },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.LocationOn, 
+                                    contentDescription = null, 
+                                    modifier = Modifier.size(16.dp),
+                                    tint = if (communityTabScope == 0) Color.White else MaterialTheme.colorScheme.outline
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    if (district != null) "My District" else "Local", 
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (communityTabScope == 0) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (communityTabScope == 0) Color.White else MaterialTheme.colorScheme.outline
+                                )
                             }
                         }
 
-                        @OptIn(ExperimentalMaterial3Api::class)
-                        val pullToRefreshState = rememberPullToRefreshState()
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            if (selectedTab == 1) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                                            .height(44.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                            .padding(4.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (communityTabScope == 1) activeColor else inactiveColor)
+                                .then(if (communityTabScope != 1) Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)) else Modifier)
+                                .clickable { communityTabScope = 1 },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Language, 
+                                    contentDescription = null, 
+                                    modifier = Modifier.size(16.dp),
+                                    tint = if (communityTabScope == 1) Color.White else MaterialTheme.colorScheme.outline
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "Global Feed", 
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (communityTabScope == 1) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (communityTabScope == 1) Color.White else MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                    }
+                }
+
+                @OptIn(ExperimentalMaterial3Api::class)
+                val pullToRefreshState = rememberPullToRefreshState()
+                
+                LaunchedEffect(selectedTab, communityTabScope) {
+                    showAllBeyond = false
+                }
+
+                PullToRefreshBox(
+                    isRefreshing = state.isLoading || state.isCommunityLoading,
+                    onRefresh = onRefresh,
+                    modifier = Modifier.fillMaxSize(),
+                    state = pullToRefreshState,
+                    indicator = {
+                        CustomPullToRefreshIndicator(
+                            isRefreshing = state.isLoading || state.isCommunityLoading,
+                            state = pullToRefreshState,
+                            modifier = Modifier.align(Alignment.TopCenter)
+                        )
+                    }
+                ) {
+                    val filteredList: List<Complaint> = if (searchQuery.isBlank()) {
+                        filteredByStatus
+                    } else {
+                        filteredByStatus.filter {
+                            it.category.contains(searchQuery, ignoreCase = true) ||
+                            it.city.contains(searchQuery, ignoreCase = true) ||
+                            it.description.contains(searchQuery, ignoreCase = true)
+                        }
+                    }.let { unsorted ->
+                        when (state.sortOption) {
+                            SortOption.DATE_DESC -> unsorted.sortedByDescending { it.createdAt }
+                            SortOption.DATE_ASC -> unsorted.sortedBy { it.createdAt }
+                            SortOption.RATING_DESC -> unsorted.sortedByDescending { it.rating }
+                            SortOption.UPVOTES_DESC -> unsorted.sortedByDescending { it.supportCount ?: 0 }
+                            SortOption.NEAREST -> {
+                                val mapped: List<Pair<Complaint, Double>> = unsorted.map { complaint ->
+                                    val lat = complaint.latitude.toDoubleOrNull() ?: 0.0
+                                    val lng = complaint.longitude.toDoubleOrNull() ?: 0.0
+                                    val uLat = userLat ?: 0.0
+                                    val uLng = userLng ?: 0.0
+                                    val dist = haversineDistance(uLat, uLng, lat, lng)
+                                    Pair(complaint, dist)
+                                }
+                                val sorted = mapped.sortedBy { it.second }
+                                if (showAllBeyond || userLat == null) {
+                                    sorted.map { it.first }
+                                } else {
+                                    sorted.filter { it.second <= 5000.0 }.map { it.first }
+                                }
+                            }
+                        }
+                    }
+
+                    val hiddenBeyondRadius = if (state.sortOption == SortOption.NEAREST && !showAllBeyond && userLat != null) {
+                        filteredByStatus.count { complaint ->
+                            val lat = complaint.latitude.toDoubleOrNull() ?: 0.0
+                            val lng = complaint.longitude.toDoubleOrNull() ?: 0.0
+                            haversineDistance(userLat ?: 0.0, userLng ?: 0.0, lat, lng) > 5000.0
+                        }
+                    } else 0
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        if (filteredList.isEmpty() && !state.isLoading && !state.isCommunityLoading) {
+                            item {
+                                Column(
+                                    modifier = Modifier.fillParentMaxSize().padding(32.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    if (hiddenBeyondRadius > 0) {
+                                        BeyondRadiusBanner(
+                                            hiddenCount = hiddenBeyondRadius,
+                                            onShowAll = { showAllBeyond = true }
+                                        )
+                                        Spacer(modifier = Modifier.height(24.dp))
+                                    }
+                                    Box(
+                                        modifier = Modifier.size(120.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer.copy(alpha=0.2f)),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        val navyColor = Color(0xFF1A3A6E)
-                                        val activeColor = navyColor
-                                        val inactiveColor = Color.Transparent
-
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .fillMaxHeight()
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(if (communityTabScope == 0) activeColor else inactiveColor)
-                                                .then(if (communityTabScope != 0) Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)) else Modifier)
-                                                .clickable { communityTabScope = 0 },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(
-                                                    Icons.Default.LocationOn, 
-                                                    contentDescription = null, 
-                                                    modifier = Modifier.size(16.dp),
-                                                    tint = if (communityTabScope == 0) Color.White else MaterialTheme.colorScheme.outline
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    if (district != null) "My District" else "Local", 
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                    fontWeight = if (communityTabScope == 0) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (communityTabScope == 0) Color.White else MaterialTheme.colorScheme.outline
-                                                )
+                                        if (selectedTab == 1) {
+                                            Box(contentAlignment = Alignment.TopCenter) {
+                                                Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
+                                                Icon(Icons.Default.People, contentDescription = null, modifier = Modifier.size(28.dp).padding(top=10.dp), tint = MaterialTheme.colorScheme.surface)
                                             }
-                                        }
-
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .fillMaxHeight()
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(if (communityTabScope == 1) activeColor else inactiveColor)
-                                                .then(if (communityTabScope != 1) Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)) else Modifier)
-                                                .clickable { communityTabScope = 1 },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(
-                                                    Icons.Default.Public, 
-                                                    contentDescription = null, 
-                                                    modifier = Modifier.size(16.dp),
-                                                    tint = if (communityTabScope == 1) Color.White else MaterialTheme.colorScheme.outline
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    "Global Feed", 
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                    fontWeight = if (communityTabScope == 1) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (communityTabScope == 1) Color.White else MaterialTheme.colorScheme.outline
-                                                )
-                                            }
+                                        } else {
+                                            Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
                                         }
                                     }
+                                    Spacer(modifier = Modifier.height(24.dp))
+                                    Text(stringResource(R.string.you_re_all_caught_up), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "Everything looks good in your area! Tap + to report a new issue and help your community.", 
+                                        style = MaterialTheme.typography.bodyMedium, 
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 8.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(24.dp))
+                                    Button(
+                                        onClick = onNavigateToCreate,
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text(stringResource(R.string.report_an_issue))
+                                    }
+                                }
                             }
-
-                            PullToRefreshBox(
-                                isRefreshing = state.isLoading || state.isCommunityLoading,
-                                onRefresh = onRefresh,
-                                modifier = Modifier.fillMaxSize(),
-                                state = pullToRefreshState,
-                                indicator = {
-                                    CustomPullToRefreshIndicator(
-                                        isRefreshing = state.isLoading || state.isCommunityLoading,
-                                        state = pullToRefreshState,
-                                        modifier = Modifier.align(Alignment.TopCenter)
+                        } else {
+                            itemsIndexed(items = filteredList, key = { _, item -> item.id }) { _, complaint ->
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 16.dp)
+                                ) {
+                                    ComplaintCard(
+                                        complaint = complaint,
+                                        isAdmin = false,
+                                        onClick = { onNavigateToDetail(complaint.id) },
+                                        onUpdateStatusClick = {},
+                                        showCommunityFeatures = true,
+                                        isSupported = state.supportedIds.contains(complaint.id),
+                                        isOwner = complaint.user?.id == userId,
+                                        onSupportClick = {
+                                            if (selectedTab == 1) {
+                                                viewModel.supportComplaint(complaint.id) {}
+                                            }
+                                        },
+                                        distanceMeters = if (userLat != null && userLng != null) {
+                                            val lat = complaint.latitude.toDoubleOrNull() ?: 0.0
+                                            val lng = complaint.longitude.toDoubleOrNull() ?: 0.0
+                                            haversineDistance(userLat!!, userLng!!, lat, lng)
+                                        } else null,
+                                        showDistance = selectedTab == 1 && district != null && (
+                                            complaint.city.contains(district, ignoreCase = true) || 
+                                            district.contains(complaint.city, ignoreCase = true)
+                                        ),
+                                        showYouReportedTag = selectedTab != 0,
+                                        currentUserId = userId
                                     )
                                 }
-                            ) {
-                                val filteredList: List<Complaint> = if (searchQuery.isBlank()) {
-                                    displayList
-                                } else {
-                                    displayList.filter {
-                                        it.category.contains(searchQuery, ignoreCase = true) ||
-                                        it.city.contains(searchQuery, ignoreCase = true) ||
-                                        it.description.contains(searchQuery, ignoreCase = true)
-                                    }
-                                }.let { unsorted ->
-                                    when (state.sortOption) {
-                                        SortOption.DATE_DESC -> unsorted.sortedByDescending { it.createdAt }
-                                        SortOption.DATE_ASC -> unsorted.sortedBy { it.createdAt }
-                                        SortOption.RATING_DESC -> unsorted.sortedByDescending { it.rating }
-                                        SortOption.UPVOTES_DESC -> unsorted.sortedByDescending { it.supportCount ?: 0 }
-                                        SortOption.NEAREST -> {
-                                            val mapped: List<Pair<Complaint, Double>> = unsorted.map { complaint ->
-                                                val lat = complaint.latitude.toDoubleOrNull() ?: 0.0
-                                                val lng = complaint.longitude.toDoubleOrNull() ?: 0.0
-                                                val uLat = userLat ?: 0.0
-                                                val uLng = userLng ?: 0.0
-                                                val dist = haversineDistance(uLat, uLng, lat, lng)
-                                                Pair(complaint, dist)
-                                            }
-                                            val sorted = mapped.sortedBy { it.second }
-                                            if (showAllBeyond || userLat == null) {
-                                                sorted.map { it.first }
-                                            } else {
-                                                sorted.filter { it.second <= 5000.0 }.map { it.first }
-                                            }
-                                        }
-                                    }
+                            }
+
+                            if (hiddenBeyondRadius > 0) {
+                                item {
+                                    BeyondRadiusBanner(
+                                        hiddenCount = hiddenBeyondRadius,
+                                        onShowAll = { showAllBeyond = true }
+                                    )
                                 }
+                            }
 
-                                val hiddenBeyondRadius = if (state.sortOption == SortOption.NEAREST && !showAllBeyond && userLat != null) {
-                                    displayList.count { complaint ->
-                                        val lat = complaint.latitude.toDoubleOrNull() ?: 0.0
-                                        val lng = complaint.longitude.toDoubleOrNull() ?: 0.0
-                                        haversineDistance(userLat ?: 0.0, userLng ?: 0.0, lat, lng) > 5000.0
-                                    }
-                                } else 0
-
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(bottom = 16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                            item {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 40.dp, horizontal = 32.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    if (filteredList.isEmpty() && !state.isLoading && !state.isCommunityLoading) {
-                                        item {
-                                            Column(
-                                                modifier = Modifier.fillParentMaxSize().padding(32.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.Center
-                                            ) {
-                                                if (hiddenBeyondRadius > 0) {
-                                                    BeyondRadiusBanner(
-                                                        hiddenCount = hiddenBeyondRadius,
-                                                        onShowAll = { showAllBeyond = true }
-                                                    )
-                                                    Spacer(modifier = Modifier.height(24.dp))
-                                                }
-                                                Box(
-                                                    modifier = Modifier.size(120.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer.copy(alpha=0.2f)),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    if (selectedTab == 1) {
-                                                        Box(contentAlignment = Alignment.TopCenter) {
-                                                            Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
-                                                            Icon(Icons.Default.People, contentDescription = null, modifier = Modifier.size(28.dp).padding(top=10.dp), tint = MaterialTheme.colorScheme.surface)
-                                                        }
-                                                    } else {
-                                                        Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
-                                                    }
-                                                }
-                                                Spacer(modifier = Modifier.height(24.dp))
-                                                Text(stringResource(R.string.you_re_all_caught_up), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                                Text(
-                                                    "Everything looks good in your area! Tap + to report a new issue and help your community.", 
-                                                    style = MaterialTheme.typography.bodyMedium, 
-                                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    modifier = Modifier.padding(top = 8.dp)
-                                                )
-                                                Spacer(modifier = Modifier.height(24.dp))
-                                                Button(
-                                                    onClick = onNavigateToCreate,
-                                                    shape = RoundedCornerShape(12.dp)
-                                                ) {
-                                                    Text(stringResource(R.string.report_an_issue))
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        itemsIndexed(items = filteredList, key = { _, item -> item.id }) { _, complaint ->
-                                            Box(
-                                                modifier = Modifier
-                                                    .padding(horizontal = 16.dp)
-                                            ) {
-                                                ComplaintCard(
-                                                    complaint = complaint,
-                                                    isAdmin = false,
-                                                    onClick = { onNavigateToDetail(complaint.id) },
-                                                    onUpdateStatusClick = {},
-                                                    showCommunityFeatures = true,
-                                                    isSupported = state.supportedIds.contains(complaint.id),
-                                                    isOwner = complaint.user?.id == userId,
-                                                    onSupportClick = {
-                                                        if (selectedTab == 1) {
-                                                            viewModel.supportComplaint(complaint.id) {}
-                                                        }
-                                                    },
-                                                    distanceMeters = if (userLat != null && userLng != null) {
-                                                        val lat = complaint.latitude.toDoubleOrNull() ?: 0.0
-                                                        val lng = complaint.longitude.toDoubleOrNull() ?: 0.0
-                                                        haversineDistance(userLat!!, userLng!!, lat, lng)
-                                                    } else null,
-                                                    showDistance = selectedTab == 1 && district != null && (
-                                                        complaint.city.contains(district, ignoreCase = true) || 
-                                                        district.contains(complaint.city, ignoreCase = true)
-                                                    ),
-                                                    currentUserId = userId
-                                                )
-                                            }
-                                        }
-
-                                        if (hiddenBeyondRadius > 0) {
-                                            item {
-                                                BeyondRadiusBanner(
-                                                    hiddenCount = hiddenBeyondRadius,
-                                                    onShowAll = { showAllBeyond = true }
-                                                )
-                                            }
-                                        }
-
-                                        item {
-                                            Column(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 40.dp, horizontal = 32.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.CheckCircle,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                                    modifier = Modifier.size(48.dp)
-                                                )
-                                                Spacer(modifier = Modifier.height(12.dp))
-                                                Text(
-                                                    text = "You're all caught up!",
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                                )
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Text(
-                                                    text = "Everything looks good in your area!\nTap + to report a new issue.",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.outline,
-                                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                                    lineHeight = 18.sp
-                                                )
-                                                Spacer(modifier = Modifier.height(24.dp))
-                                            }
-                                        }
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = "You're all caught up!",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Everything looks good in your area!\nTap + to report a new issue.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        lineHeight = 18.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(24.dp))
                                 }
                             }
                         }
+                    }
                 }
+            }
+        }
+    }
+}
+@Composable
+fun StatusChip(
+    label:      String,
+    count:      Int,
+    color:      Color,
+    isSelected: Boolean,
+    onClick:    () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                if (isSelected) color.copy(alpha = 0.12f)
+                else            Color(0xFFF2F4F8)
+            )
+            .border(
+                width  = if (isSelected) 1.5.dp else 0.5.dp,
+                color  = if (isSelected) color else Color(0xFFE8EDF5),
+                shape  = RoundedCornerShape(20.dp),
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+    ) {
+        Row(
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            // Dot indicator
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(color)
+            )
+            Text(
+                text       = "$label $count",
+                fontSize   = 12.sp,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                color      = if (isSelected) color else Color(0xFF6A7F9A),
+            )
         }
     }
 }

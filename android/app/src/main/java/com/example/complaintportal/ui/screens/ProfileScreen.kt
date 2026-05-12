@@ -68,7 +68,10 @@ data class UserProfile(
 fun ProfileScreen(
     authViewModel: AuthViewModel,
     complaintViewModel: ComplaintViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onMyReports: () -> Unit = {},
+    onUpvotedPosts: () -> Unit = {},
+    onAnalytics: () -> Unit = {},
 ) {
     val authState by authViewModel.authState.collectAsState()
     val complaintState by complaintViewModel.state.collectAsState()
@@ -209,6 +212,31 @@ fun ProfileScreen(
             }
 
             Spacer(Modifier.height(20.dp))
+
+            // ── MY ACTIVITY section ───────────────────────────────
+            ProfileSection(title = stringResource(R.string.my_activity)) {
+                ActionRow(
+                    icon    = Icons.Outlined.Description,
+                    label   = stringResource(R.string.my_reports),
+                    badge   = profile.reportsCount.toString(),
+                    onClick = onMyReports,
+                )
+                SectionDivider()
+                ActionRow(
+                    icon    = Icons.Outlined.ThumbUp,
+                    label   = stringResource(R.string.upvoted_posts),
+                    badge   = profile.upvotesCount.toString(),
+                    onClick = onUpvotedPosts,
+                )
+                SectionDivider()
+                ActionRow(
+                    icon    = Icons.Outlined.BarChart,
+                    label   = stringResource(R.string.my_analytics),
+                    onClick = onAnalytics,
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
 
             // ── Account info ──────────────────────────────────────────────────
             ProfileSection(title = stringResource(R.string.account_info)) {
