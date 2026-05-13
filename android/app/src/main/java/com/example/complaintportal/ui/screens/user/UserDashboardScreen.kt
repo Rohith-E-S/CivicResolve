@@ -427,61 +427,37 @@ fun UserDashboardScreen(
                 }
             }
 
-            @OptIn(ExperimentalMaterial3Api::class)
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                TabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    divider = {},
-                    indicator = { tabPositions ->
-                        if (selectedTab < tabPositions.size) {
-                            TabRowDefaults.SecondaryIndicator(
-                                Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                ) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { 
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            selectedTab = 0 
-                        },
-                        text = { Text(stringResource(R.string.my_reports), style = MaterialTheme.typography.titleSmall, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium) }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { 
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            selectedTab = 1 
-                        },
-                        text = { Text(stringResource(R.string.community_hub), style = MaterialTheme.typography.titleSmall, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium) }
-                    )
-                }
-
-                if (selectedTab == 1) {
-                    TooltipBox(
-                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                        tooltip = {
-                            PlainTooltip {
-                                Text("Hide my reports")
-                            }
-                        },
-                        state = rememberTooltipState()
-                    ) {
-                        Switch(
-                            checked = hideMyReports,
-                            onCheckedChange = { hideMyReports = it },
-                            modifier = Modifier.scale(0.8f).padding(end = 8.dp)
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.primary,
+                divider = {},
+                indicator = { tabPositions ->
+                    if (selectedTab < tabPositions.size) {
+                        TabRowDefaults.SecondaryIndicator(
+                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
-                }
+                },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { 
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        selectedTab = 0 
+                    },
+                    text = { Text(stringResource(R.string.my_reports), style = MaterialTheme.typography.titleSmall, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium) }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { 
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        selectedTab = 1 
+                    },
+                    text = { Text(stringResource(R.string.community_hub), style = MaterialTheme.typography.titleSmall, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium) }
+                )
             }
 
             val communityFiltered = state.communityComplaints.filter { it.user?.id != userId }
