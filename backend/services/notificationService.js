@@ -88,3 +88,54 @@ export async function notifyNewInDistrict(io, { districtUserIds, complaintId, ca
   );
   return Promise.all(promises);
 }
+
+/** Notify nearby users that an issue needs verification */
+export async function notifyNearbyForVerification(io, { nearbyUserIds, complaintId, category, city }) {
+  const promises = nearbyUserIds.map((userId) =>
+    createNotification(io, {
+      userId,
+      type: "verification_needed",
+      title: "Help Verify Resolution",
+      message: `The "${category}" issue in ${city} was marked resolved. Can you verify it?`,
+      complaintId,
+    })
+  );
+  return Promise.all(promises);
+}
+
+/** Notify owner that issue is verified resolved */
+export async function notifyOwnerVerified(io, { complaintOwnerId, complaintId, category, count }) {
+  return createNotification(io, {
+    userId: complaintOwnerId,
+    type: "verified",
+    title: "Issue Verified Resolved",
+    message: `Your "${category}" report has been verified resolved by ${count} citizens!`,
+    complaintId,
+  });
+}
+
+/** Notify admin that a resolution is disputed */
+export async function notifyAdminDisputed(io, { adminIds, complaintId, category, aiConfidence }) {
+  const promises = adminIds.map((userId) =>
+    createNotification(io, {
+      userId,
+      type: "disputed",
+      title: "Resolution Disputed",
+      message: `A resolution for "${category}" was disputed. AI confirms issue may still exist (${aiConfidence}%).`,
+      complaintId,
+    })
+  );
+  return Promise.all(promises);
+}
+
+/** Notify disputer when admin decides */
+export async function notifyDisputeResolved(io, { userId, complaintId, category, action }) {
+  const actionText = action === "reopen" ? "re-opened" : "confirmed resolved";
+  return createNotification(io, {
+    userId,
+    type: "dispute_resolved",
+    title: "Dispute Reviewed",
+    message: `Admin reviewed your dispute for "${category}" and ${actionText} the issue.`,
+    complaintId,
+  });
+}

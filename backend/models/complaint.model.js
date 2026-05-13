@@ -71,9 +71,47 @@ const complaintSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["new", "under_review", "in_progress", "resolved"],
+      enum: [
+        "new",
+        "under_review",
+        "in_progress",
+        "pending_verification",
+        "disputed",
+        "re_opened",
+        "resolved",
+        "confirmed_resolved",
+      ],
       default: "new",
       lowercase: true,
+    },
+    verifications: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        timestamp: { type: Date, default: Date.now },
+        location: {
+          type: { type: String, enum: ["Point"], default: "Point" },
+          coordinates: [Number],
+        },
+      },
+    ],
+    verificationCount: {
+      type: Number,
+      default: 0,
+    },
+    dispute: {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      photo: String,
+      description: String,
+      aiAnalysis: {
+        issueStillPresent: Boolean,
+        confidence: Number,
+        reasoning: String,
+      },
+      timestamp: { type: Date, default: Date.now },
+      location: {
+        type: { type: String, enum: ["Point"], default: "Point" },
+        coordinates: [Number],
+      },
     },
     location: {
       type: {
@@ -90,7 +128,11 @@ const complaintSchema = new mongoose.Schema(
       reported: { type: Date, default: Date.now },
       underReview: { type: Date, default: null },
       inProgress: { type: Date, default: null },
+      pendingVerification: { type: Date, default: null },
+      disputed: { type: Date, default: null },
+      reopened: { type: Date, default: null },
       resolved: { type: Date, default: null },
+      confirmedResolved: { type: Date, default: null },
     },
     rating: {
       type: Number,

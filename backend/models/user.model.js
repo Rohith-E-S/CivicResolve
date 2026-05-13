@@ -67,9 +67,29 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // Last known GPS location (updated from the Android app)
+    lastLocation: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        default: undefined, // not set until user shares location
+      },
+    },
+
+    lastLocationUpdatedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );
+
+userSchema.index({ lastLocation: "2dsphere" });
 
 userSchema.methods.getJWT = function () {
   return jwt.sign({ _id: this.id }, process.env.JWT_SECRET_KEY, {

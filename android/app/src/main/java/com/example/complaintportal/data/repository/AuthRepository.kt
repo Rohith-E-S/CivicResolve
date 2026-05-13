@@ -195,4 +195,17 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
             Result.failure(e)
         }
     }
+
+    suspend fun updateUserLocation(lat: Double, lng: Double): Result<BaseResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.updateUserLocation(mapOf("latitude" to lat, "longitude" to lng))
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception("Location update failed"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

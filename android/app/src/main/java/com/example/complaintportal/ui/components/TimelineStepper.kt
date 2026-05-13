@@ -239,42 +239,75 @@ private fun TimelineRow(
 
 // ── Build steps from current status + timestamps ──────────────────────────────
 private fun buildSteps(status: String, ts: ComplaintTimestamps?): List<TimelineStep> {
-    // 3-step flow: new/under_review → in_progress → resolved
-    val currentIdx = when (status.lowercase()) {
-        "new", "under_review" -> 0
-        "in_progress"         -> 1
-        "resolved"            -> 2
-        else                  -> 0
+    val s = status.lowercase()
+
+    // Map every backend status to a step index (0-based)
+    val currentIdx = when (s) {
+        "new", "under_review"  -> 0   // still at "Reported"
+        "in_progress",
+        "re_opened"            -> 1   // field work happening
+        "pending_verification",
+        "disputed"             -> 2   // admin resolved, awaiting community
+        "resolved",
+        "confirmed_resolved"   -> 3   // citizens confirmed it
+        else                   -> 0
+    }
+
+    fun stepState(stepIdx: Int) = when {
+        currentIdx > stepIdx  -> StepState.COMPLETED
+        currentIdx == stepIdx -> StepState.CURRENT
+        else                  -> StepState.PENDING
     }
 
     return listOf(
+        // ── Step 0: Reported ────────────────────────────────
         TimelineStep(
             label       = "Reported",
             description = "Issue submitted by citizen",
             icon        = Icons.Default.Flag,
             timestamp   = ts?.reported,
-            state       = StepState.COMPLETED,   // always completed if complaint exists
+            state       = StepState.COMPLETED, // always done once complaint exists
         ),
+
+        // ── Step 1: In Progress ──────────────────────────────
         TimelineStep(
-            label       = "In Progress",
-            description = "Field team dispatched to resolve",
-            icon        = Icons.Default.Build,
-            timestamp   = ts?.inProgress,
-            state       = when {
-                currentIdx > 1  -> StepState.COMPLETED
-                currentIdx == 1 -> StepState.CURRENT
-                else            -> StepState.PENDING
-            },
+            label       = if (s == "re_opened") "Re-opened" else "In Progress",
+            description = if (s == "re_opened")
+                              "Issue re-opened after citizen dispute"
+                          else
+                              "Admin assigned — field team working on it",
+            icon        = if (s == "re_opened") Icons.Default.Replay else Icons.Default.Build,
+            timestamp   = ts?.inProgress ?: ts?.reopened,
+            state       = stepState(1),
         ),
+
+        // ── Step 2: Resolved by Admin ────────────────────────
         TimelineStep(
-            label       = "Resolved",
-            description = "Issue has been fixed successfully",
-            icon        = Icons.Default.CheckCircle,
-            timestamp   = ts?.resolved,
-            state       = when {
-                currentIdx >= 3 -> StepState.COMPLETED
-                else            -> StepState.PENDING
+            label       = if (s == "disputed") "Disputed" else "Resolved by Admin",
+            description = when (s) {
+                "disputed"             -> "A citizen disputed — admin review pending"
+                "pending_verification" -> "Admin marked resolved — awaiting citizen verification"
+                else                   -> "Admin closed the issue"
             },
+            icon        = when (s) {
+                "disputed" -> Icons.Default.ReportProblem
+                else       -> Icons.Default.AdminPanelSettings
+            },
+            timestamp   = ts?.pendingVerification ?: ts?.disputed,
+            state       = stepState(2),
+        ),
+
+        // ── Step 3: Citizen Verification ─────────────────────
+        TimelineStep(
+            label       = if (s == "confirmed_resolved") "Confirmed Resolved" else "Citizen Verification",
+            description = when (s) {
+                "confirmed_resolved" -> "Community confirmed the fix. Issue fully closed ✅"
+                "resolved"           -> "3 citizens verified the fix on-site ✅"
+                else                 -> "Nearby citizens verify the fix on-site (3 needed)"
+            },
+            icon        = if (currentIdx == 3) Icons.Default.VerifiedUser else Icons.Default.Groups,
+            timestamp   = ts?.resolved ?: ts?.confirmedResolved,
+            state       = stepState(3),
         ),
     )
 }

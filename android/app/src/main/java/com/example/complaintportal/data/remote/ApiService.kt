@@ -38,6 +38,9 @@ interface ApiService {
     @POST("auth/update-home-district")
     suspend fun updateHomeDistrict(@Body request: Map<String, String>): Response<AuthResponse>
 
+    @POST("auth/update-location")
+    suspend fun updateUserLocation(@Body request: Map<String, Double>): Response<BaseResponse>
+
     @GET("auth/check-auth")
     suspend fun checkAuth(): Response<AuthResponse>
 
@@ -114,6 +117,29 @@ interface ApiService {
 
     @POST("complaint/support/{id}")
     suspend fun supportComplaint(@Path("id") id: String): Response<BaseResponse>
+
+    // Community Verification & Disputes
+    @POST("complaint/verify/{id}")
+    suspend fun verifyComplaint(
+        @Path("id") id: String,
+        @Body location: Map<String, Double>
+    ): Response<SingleComplaintResponse>
+
+    @Multipart
+    @POST("complaint/dispute/{id}")
+    suspend fun disputeComplaint(
+        @Path("id") id: String,
+        @Part("latitude") latitude: RequestBody,
+        @Part("longitude") longitude: RequestBody,
+        @Part("description") description: RequestBody,
+        @Part disputePhoto: MultipartBody.Part
+    ): Response<SingleComplaintResponse>
+
+    @PATCH("complaint/dispute/resolve/{id}")
+    suspend fun resolveDispute(
+        @Path("id") id: String,
+        @Body request: Map<String, String>
+    ): Response<SingleComplaintResponse>
 
     @GET("complaint/admin/stats")
     suspend fun getAdminComplaintStats(): Response<AdminComplaintStatsResponse>

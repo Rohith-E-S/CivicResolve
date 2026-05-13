@@ -336,6 +336,18 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
             }
         }
     }
+
+    /** Silently updates the user's last-known GPS to the backend.
+     *  Called once when the dashboard loads. Used for 1km proximity notifications. */
+    fun updateUserLocation(lat: Double, lng: Double) {
+        viewModelScope.launch {
+            try {
+                repository.updateUserLocation(lat, lng)
+            } catch (_: Exception) {
+                // Silently ignore — this is a background best-effort update
+            }
+        }
+    }
 }
 
 class AuthViewModelFactory(private val repository: AuthRepository) : ViewModelProvider.Factory {

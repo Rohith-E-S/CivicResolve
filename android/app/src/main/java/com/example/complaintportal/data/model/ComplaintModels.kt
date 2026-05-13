@@ -23,17 +23,49 @@ data class Complaint(
     val rating: Int,
     val supportCount: Int? = 0,
     val supporters: List<String>? = emptyList(),
+    val verificationCount: Int? = 0,
+    val verifications: List<Verification>? = emptyList(),
+    val dispute: DisputeInfo? = null,
     val createdAt: String?,
     val updatedAt: String?,
     @Json(name = "timestamps") val timestamps: ComplaintTimestamps? = null
 )
 
 @JsonClass(generateAdapter = true)
+data class Verification(
+    val userId: String,
+    val timestamp: String,
+)
+
+@JsonClass(generateAdapter = true)
+data class DisputeInfo(
+    val userId: String?,
+    val photo: String?,
+    val description: String?,
+    val aiAnalysis: AiDisputeAnalysis?,
+    val timestamp: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class AiDisputeAnalysis(
+    val issueStillPresent: Boolean?,
+    val confidence: Int?,
+    val reasoning: String?
+)
+
+// Helper: a DisputeInfo is only a real dispute if userId is set
+fun DisputeInfo?.isRealDispute(): Boolean = this?.userId != null
+
+@JsonClass(generateAdapter = true)
 data class ComplaintTimestamps(
-    @Json(name = "reported")    val reported:    String? = null,
-    @Json(name = "underReview") val underReview: String? = null,
-    @Json(name = "inProgress")  val inProgress:  String? = null,
-    @Json(name = "resolved")    val resolved:    String? = null,
+    @Json(name = "reported")            val reported:            String? = null,
+    @Json(name = "underReview")         val underReview:         String? = null,
+    @Json(name = "inProgress")          val inProgress:          String? = null,
+    @Json(name = "pendingVerification") val pendingVerification: String? = null,
+    @Json(name = "disputed")            val disputed:            String? = null,
+    @Json(name = "reopened")            val reopened:            String? = null,
+    @Json(name = "resolved")            val resolved:            String? = null,
+    @Json(name = "confirmedResolved")   val confirmedResolved:   String? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -81,6 +113,8 @@ data class AllComplaintsData(
     val newComplaint: List<Complaint>?,
     val underReviewComplaint: List<Complaint>?,
     val inProgressComplaint: List<Complaint>?,
+    val pendingVerificationComplaint: List<Complaint>?,
+    val disputedComplaint: List<Complaint>?,
     val resolvedComplaint: List<Complaint>?
 )
 

@@ -17,6 +17,8 @@ data class ComplaintState(
     val isLoading: Boolean = false,
     val newComplaints: List<Complaint> = emptyList(),
     val inProgressComplaints: List<Complaint> = emptyList(),
+    val pendingVerificationComplaints: List<Complaint> = emptyList(),
+    val disputedComplaints: List<Complaint> = emptyList(),
     val resolvedComplaints: List<Complaint> = emptyList(),
     val communityComplaints: List<Complaint> = emptyList(),
     val currentComplaint: Complaint? = null,
@@ -28,7 +30,12 @@ data class ComplaintState(
     val aiResult: AiAnalysisResult? = null,
     val pendingComplaintData: PendingComplaintData? = null,
     val nearbyComplaints: List<NearbyComplaint> = emptyList(),
-    val sortOption: SortOption = SortOption.DATE_DESC
+    val sortOption: SortOption = SortOption.DATE_DESC,
+    
+    val verifyLoading: Boolean = false,
+    val disputeLoading: Boolean = false,
+    val verifyError: String? = null,
+    val disputeError: String? = null
 )
 
 data class PendingComplaintData(
@@ -69,8 +76,10 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
                         isLoading = false,
                         supportedIds = _state.value.supportedIds + newSupportedIds,
                         newComplaints = complaints.filter { it.status.lowercase() in listOf("new", "under_review") },
-                        inProgressComplaints = complaints.filter { it.status.lowercase() == "in_progress" },
-                        resolvedComplaints = complaints.filter { it.status.lowercase() == "resolved" }
+                        inProgressComplaints = complaints.filter { it.status.lowercase() in listOf("in_progress", "re_opened") },
+                        pendingVerificationComplaints = complaints.filter { it.status.lowercase() == "pending_verification" },
+                        disputedComplaints = complaints.filter { it.status.lowercase() == "disputed" },
+                        resolvedComplaints = complaints.filter { it.status.lowercase() in listOf("resolved", "confirmed_resolved") }
                     )
                 } else {
                     _state.value = _state.value.copy(isLoading = false, error = response.message)
@@ -88,13 +97,16 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
             result.onSuccess { response ->
                 if (response.success) {
                     val data = response.complaints
-                    val allComplaints = (data?.newComplaint ?: emptyList()) + 
-                                       (data?.inProgressComplaint ?: emptyList()) + 
-                                       (data?.resolvedComplaint ?: emptyList())
 
                     // Extract supported IDs
+                    val allForSupport = (data?.newComplaint ?: emptyList()) +
+                                       (data?.underReviewComplaint ?: emptyList()) +
+                                       (data?.inProgressComplaint ?: emptyList()) +
+                                       (data?.pendingVerificationComplaint ?: emptyList()) +
+                                       (data?.disputedComplaint ?: emptyList()) +
+                                       (data?.resolvedComplaint ?: emptyList())
                     val newSupportedIds = if (userId != null) {
-                        allComplaints.filter { it.supporters?.contains(userId) == true }.map { it.id }.toSet()
+                        allForSupport.filter { it.supporters?.contains(userId) == true }.map { it.id }.toSet()
                     } else emptySet()
 
                     _state.value = _state.value.copy(
@@ -102,6 +114,8 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
                         supportedIds = _state.value.supportedIds + newSupportedIds,
                         newComplaints = (data?.newComplaint ?: emptyList()) + (data?.underReviewComplaint ?: emptyList()),
                         inProgressComplaints = data?.inProgressComplaint ?: emptyList(),
+                        pendingVerificationComplaints = data?.pendingVerificationComplaint ?: emptyList(),
+                        disputedComplaints = data?.disputedComplaint ?: emptyList(),
                         resolvedComplaints = data?.resolvedComplaint ?: emptyList()
                     )
                 } else {
@@ -336,6 +350,73 @@ class ComplaintViewModel(private val repository: ComplaintRepository) : ViewMode
                 if (response.success) {
                     _state.value = _state.value.copy(nearbyComplaints = response.complaints)
                 }
+            }
+        }
+    }
+
+    fun verifyComplaint(id: String, lat: Double, lng: Double, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(verifyLoading = true, verifyError = null)
+            val result = repository.verifyComplaint(id, lat, lng)
+            result.onSuccess { response ->
+                if (response.success) {
+                    _state.value = _state.value.copy(
+                        verifyLoading = false,
+                        currentComplaint = response.complaint
+                    )
+                    onSuccess()
+                } else {
+                    _state.value = _state.value.copy(verifyLoading = false, verifyError = response.message)
+                }
+            }.onFailure {
+                _state.value = _state.value.copy(verifyLoading = false, verifyError = it.message)
+            }
+        }
+    }
+
+    fun disputeComplaint(
+        id: String,
+        lat: RequestBody,
+        lng: RequestBody,
+        description: RequestBody,
+        photo: MultipartBody.Part,
+        onSuccess: () -> Unit
+    ) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(disputeLoading = true, disputeError = null)
+            val result = repository.disputeComplaint(id, lat, lng, description, photo)
+            result.onSuccess { response ->
+                if (response.success) {
+                    _state.value = _state.value.copy(
+                        disputeLoading = false,
+                        currentComplaint = response.complaint
+                    )
+                    onSuccess()
+                } else {
+                    _state.value = _state.value.copy(disputeLoading = false, disputeError = response.message)
+                }
+            }.onFailure {
+                _state.value = _state.value.copy(disputeLoading = false, disputeError = it.message)
+            }
+        }
+    }
+
+    fun resolveDispute(id: String, action: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true, error = null)
+            val result = repository.resolveDispute(id, action)
+            result.onSuccess { response ->
+                if (response.success) {
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        currentComplaint = response.complaint
+                    )
+                    onSuccess()
+                } else {
+                    _state.value = _state.value.copy(isLoading = false, error = response.message)
+                }
+            }.onFailure {
+                _state.value = _state.value.copy(isLoading = false, error = it.message)
             }
         }
     }

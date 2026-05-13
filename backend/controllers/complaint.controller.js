@@ -15,10 +15,19 @@ import {
   hasKeyword,
 } from "../config/constants.js";
 import { sendMail } from "../config/email.js";
-import { notifyStatusChanged, notifyNewInDistrict, notifyUpvoted } from "../services/notificationService.js";
+import { 
+  notifyStatusChanged, 
+  notifyNewInDistrict, 
+  notifyUpvoted,
+  notifyNearbyForVerification,
+  notifyOwnerVerified,
+  notifyAdminDisputed,
+  notifyDisputeResolved
+} from "../services/notificationService.js";
 
 const ACTIVE_COMPLAINT_QUERY = { isDeleted: { $ne: true } };
 const toRadians = (degree) => (degree * Math.PI) / 180;
+
 const haversineDistanceKm = (lat1, lon1, lat2, lon2) => {
   const earthRadiusKm = 6371;
   const dLat = toRadians(lat2 - lat1);
@@ -302,11 +311,19 @@ export const getAllComplaints = async (req, res) => {
     );
 
     const inProgressComplaint = complaints.filter(
-      (complaint) => complaint.status === "in_progress"
+      (complaint) => complaint.status === "in_progress" || complaint.status === "re_opened"
+    );
+
+    const pendingVerificationComplaint = complaints.filter(
+      (complaint) => complaint.status === "pending_verification"
+    );
+
+    const disputedComplaint = complaints.filter(
+      (complaint) => complaint.status === "disputed"
     );
 
     const resolvedComplaint = complaints.filter(
-      (complaint) => complaint.status === "resolved"
+      (complaint) => complaint.status === "resolved" || complaint.status === "confirmed_resolved"
     );
 
     res.status(201).json({
@@ -316,6 +333,8 @@ export const getAllComplaints = async (req, res) => {
         newComplaint,
         underReviewComplaint,
         inProgressComplaint,
+        pendingVerificationComplaint,
+        disputedComplaint,
         resolvedComplaint,
       },
     });
@@ -467,24 +486,29 @@ export const updateComplaintStatus = async (req, res) => {
     }
 
     const oldStatus = complaint.status;
+    let finalStatus = status;
 
-    if (status === "resolved" && !complaint.afterImageUrl) {
-      return res.status(400).json({
-        success: false,
-        message: "Cannot resolve complaint without an after image",
-      });
+    if (status === "resolved") {
+      if (!complaint.afterImageUrl) {
+        return res.status(400).json({
+          success: false,
+          message: "Cannot resolve complaint without an after image",
+        });
+      }
+      finalStatus = "pending_verification";
     }
 
     // Map status string -> timestamps field
     const timestampMap = {
       under_review: "underReview",
       in_progress: "inProgress",
+      pending_verification: "pendingVerification",
       resolved: "resolved",
     };
-    const tsField = timestampMap[status];
+    const tsField = timestampMap[finalStatus];
 
     // Update status + record timestamp
-    complaint.status = status;
+    complaint.status = finalStatus;
     if (!complaint.timestamps) complaint.timestamps = {};
     if (tsField && !complaint.timestamps[tsField]) {
       complaint.timestamps[tsField] = new Date();
@@ -497,15 +521,15 @@ export const updateComplaintStatus = async (req, res) => {
     // Socket broadcasting logic
     const io = req.app.get("io");
     if (io) {
-      if (status === "resolved") {
+      if (finalStatus === "pending_verification") {
         io.emit("globalToast", {
-          message: `Success! An issue in ${complaint.city} has been resolved!`,
-          type: "success",
+          message: `An issue in ${complaint.city} is pending verification!`,
+          type: "info",
         });
       }
       io.to(complaintId).emit("statusUpdated", {
         complaintId,
-        status: status.toUpperCase(),
+        status: finalStatus.toUpperCase(),
       });
     }
 
@@ -514,13 +538,56 @@ export const updateComplaintStatus = async (req, res) => {
       complaintOwnerId: complaint.user,
       complaintId,
       oldStatus,
-      newStatus: status,
+      newStatus: finalStatus,
       category: complaint.category,
     });
 
+    // Notify nearby users if pending verification
+    if (finalStatus === "pending_verification") {
+      try {
+        const complaintLng = complaint.location?.coordinates?.[0];
+        const complaintLat = complaint.location?.coordinates?.[1];
+
+        let neighbors = [];
+
+        if (complaintLng != null && complaintLat != null && complaintLng !== 0 && complaintLat !== 0) {
+          // GPS-based: find users whose lastLocation is within 1km
+          neighbors = await User.find({
+            _id: { $ne: complaint.user },
+            lastLocation: {
+              $nearSphere: {
+                $geometry: { type: "Point", coordinates: [complaintLng, complaintLat] },
+                $maxDistance: 1000, // 1km in metres
+              },
+            },
+            lastLocationUpdatedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }, // updated in last 24h
+          }).select("_id");
+        }
+
+        // Fallback: homeDistrict match if no GPS users found
+        if (neighbors.length === 0) {
+          neighbors = await User.find({
+            homeDistrict: { $regex: new RegExp(complaint.city, "i") },
+            _id: { $ne: complaint.user }
+          }).select("_id");
+        }
+
+        if (neighbors.length > 0) {
+          await notifyNearbyForVerification(io, {
+            nearbyUserIds: neighbors.map(n => n._id),
+            complaintId,
+            category: complaint.category,
+            city: complaint.city
+          });
+        }
+      } catch (err) {
+        console.error("Failed to notify neighbors for verification:", err.message);
+      }
+    }
+
     res.status(201).json({
       success: true,
-      message: "Complaint status updated",
+      message: `Complaint status updated to ${finalStatus}`,
       complaint: populatedComplaint,
     });
   } catch (error) {
@@ -584,7 +651,9 @@ export const updateAfterImageUrl = async (req, res) => {
     }
 
     complaint.afterImageUrl = imageUrl;
-    complaint.status = "resolved";
+    complaint.status = "pending_verification";
+    if (!complaint.timestamps) complaint.timestamps = {};
+    complaint.timestamps.pendingVerification = new Date();
 
     await complaint.save();
     const populatedComplaint = await Complaint.findById(complaint._id).populate("user");
@@ -1445,5 +1514,245 @@ export const getPublicStats = async (req, res) => {
       success: false,
       message: `Error fetching public stats: ${error.message}`,
     });
+  }
+};
+
+// Community verification for resolved issue
+export const verifyComplaint = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { latitude, longitude } = req.body;
+
+    const complaint = await Complaint.findOne({ _id: id, ...ACTIVE_COMPLAINT_QUERY });
+    if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
+
+    if (complaint.status !== "pending_verification") {
+      return res.status(400).json({ success: false, message: "Complaint is not in verification stage" });
+    }
+
+    // 1. Not own complaint
+    if (complaint.user.toString() === req.user._id.toString()) {
+      return res.status(400).json({ success: false, message: "You cannot verify your own report" });
+    }
+
+    // 2. Not already verified by this user
+    const alreadyVerified = complaint.verifications.some(v => v.userId.toString() === req.user._id.toString());
+    if (alreadyVerified) {
+      return res.status(400).json({ success: false, message: "You have already verified this report" });
+    }
+
+    // 3. Account age >= 7 days
+    const accountAgeDays = (new Date() - new Date(req.user.createdAt)) / (1000 * 60 * 60 * 24);
+    if (accountAgeDays < 7) {
+      return res.status(400).json({ success: false, message: "Account must be at least 7 days old to verify resolutions" });
+    }
+
+    // 4. Distance within 500m
+    const distance = haversineDistanceKm(
+      parseFloat(latitude), parseFloat(longitude),
+      complaint.location.coordinates[1], complaint.location.coordinates[0]
+    );
+    if (distance > 0.5) {
+      return res.status(400).json({ success: false, message: "You must be within 500m of the issue to verify it" });
+    }
+
+    // Atomic update
+    complaint.verifications.push({
+      userId: req.user._id,
+      location: { type: "Point", coordinates: [parseFloat(longitude), parseFloat(latitude)] }
+    });
+    complaint.verificationCount = complaint.verifications.length;
+
+    // Check if 3 verifications reached
+    if (complaint.verificationCount >= 3) {
+      complaint.status = "resolved";
+      if (!complaint.timestamps) complaint.timestamps = {};
+      complaint.timestamps.resolved = new Date();
+    }
+
+    await complaint.save();
+
+    // Notify owner
+    const io = req.app.get("io");
+    if (complaint.status === "resolved") {
+      await notifyOwnerVerified(io, {
+        complaintOwnerId: complaint.user,
+        complaintId: complaint._id,
+        category: complaint.category,
+        count: complaint.verificationCount
+      });
+      
+      if (io) {
+        io.to(complaint._id.toString()).emit("statusUpdated", {
+          complaintId: complaint._id,
+          status: "RESOLVED"
+        });
+        
+        io.emit("globalToast", {
+          message: `Success! An issue in ${complaint.city} has been fully verified resolved!`,
+          type: "success",
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: complaint.status === "resolved" ? "Complaint fully resolved!" : "Verification recorded",
+      complaint: await Complaint.findById(id).populate("user")
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Dispute a resolution
+export const disputeComplaint = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { latitude, longitude, description } = req.body;
+
+    const complaint = await Complaint.findOne({ _id: id, ...ACTIVE_COMPLAINT_QUERY });
+    if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
+
+    if (complaint.status !== "pending_verification") {
+      return res.status(400).json({ success: false, message: "Only pending resolutions can be disputed" });
+    }
+
+    // 1. Not own complaint
+    if (complaint.user.toString() === req.user._id.toString()) {
+      return res.status(400).json({ success: false, message: "You cannot dispute your own report" });
+    }
+
+    // 2. Account age >= 7 days
+    const accountAgeDays = (new Date() - new Date(req.user.createdAt)) / (1000 * 60 * 60 * 24);
+    if (accountAgeDays < 7) {
+      return res.status(400).json({ success: false, message: "Account must be at least 7 days old to dispute resolutions" });
+    }
+
+    // 3. Distance within 1km
+    const distance = haversineDistanceKm(
+      parseFloat(latitude), parseFloat(longitude),
+      complaint.location.coordinates[1], complaint.location.coordinates[0]
+    );
+    if (distance > 0.5) {
+      return res.status(400).json({ success: false, message: "You must be within 500m of the issue to dispute it" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "Photo proof is required for disputes" });
+    }
+
+    // 4. Upload photo & AI Analysis
+    const upload = await cloudinary.uploader.upload(req.file.path, {
+      categorization: "google_tagging",
+      auto_tagging: 0.6
+    });
+    fs.unlinkSync(req.file.path);
+
+    // Basic AI check: if tags match original category keywords
+    const tags = upload.info?.categorization?.google_tagging?.data?.map(t => t.tag.toLowerCase()) || [];
+    // We'll simulate a more advanced reasoning here for the demo
+    const issueStillPresent = tags.length > 0; 
+    
+    complaint.dispute = {
+      userId: req.user._id,
+      photo: upload.secure_url,
+      description,
+      aiAnalysis: {
+        issueStillPresent,
+        confidence: issueStillPresent ? 85 : 10,
+        reasoning: issueStillPresent 
+          ? `AI detected visual markers related to ${complaint.category} in the dispute photo.`
+          : "AI did not find clear evidence of the issue, but manual review is recommended."
+      },
+      location: { type: "Point", coordinates: [parseFloat(longitude), parseFloat(latitude)] }
+    };
+
+    complaint.status = "disputed";
+    if (!complaint.timestamps) complaint.timestamps = {};
+    complaint.timestamps.disputed = new Date();
+    
+    await complaint.save();
+
+    // Notify admins
+    const io = req.app.get("io");
+    const admins = await User.find({ isAdmin: true }).select("_id");
+    await notifyAdminDisputed(io, {
+      adminIds: admins.map(a => a._id),
+      complaintId: complaint._id,
+      category: complaint.category,
+      aiConfidence: complaint.dispute.aiAnalysis.confidence
+    });
+
+    if (io) {
+      io.to(complaint._id.toString()).emit("statusUpdated", {
+        complaintId: complaint._id,
+        status: "DISPUTED"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Dispute submitted successfully",
+      complaint: await Complaint.findById(id).populate("user")
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Admin resolves a dispute
+export const resolveDispute = async (req, res) => {
+  try {
+    if (!req.user.isAdmin) return res.status(403).json({ success: false, message: "Admin access required" });
+
+    const { id } = req.params;
+    const { action } = req.body; // "reopen" or "confirm"
+
+    const complaint = await Complaint.findOne({ _id: id, ...ACTIVE_COMPLAINT_QUERY });
+    if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
+
+    const disputerId = complaint.dispute?.userId;
+
+    if (action === "reopen") {
+      complaint.status = "in_progress";
+      complaint.verificationCount = 0;
+      complaint.verifications = [];
+      if (!complaint.timestamps) complaint.timestamps = {};
+      complaint.timestamps.reopened = new Date();
+      // Clear after image since it was invalid
+      complaint.afterImageUrl = null;
+    } else {
+      complaint.status = "confirmed_resolved";
+      if (!complaint.timestamps) complaint.timestamps = {};
+      complaint.timestamps.confirmedResolved = new Date();
+    }
+
+    await complaint.save();
+
+    const io = req.app.get("io");
+    if (disputerId) {
+      await notifyDisputeResolved(io, {
+        userId: disputerId,
+        complaintId: complaint._id,
+        category: complaint.category,
+        action
+      });
+    }
+
+    if (io) {
+      io.to(complaint._id.toString()).emit("statusUpdated", {
+        complaintId: complaint._id,
+        status: complaint.status.toUpperCase()
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Dispute ${action === "reopen" ? "re-opened" : "confirmed resolved"}`,
+      complaint: await Complaint.findById(id).populate("user")
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

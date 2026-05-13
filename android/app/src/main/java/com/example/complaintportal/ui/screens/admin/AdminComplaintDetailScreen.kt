@@ -36,6 +36,10 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.complaintportal.ui.viewmodel.ComplaintViewModel
 import androidx.compose.ui.res.stringResource
 import com.example.complaintportal.R
+import com.example.complaintportal.ui.components.ComplaintTimeline
+import com.example.complaintportal.ui.components.DisputeInfoCard
+import com.example.complaintportal.ui.components.VerificationCard
+import androidx.compose.foundation.BorderStroke
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 @Composable
@@ -248,6 +252,51 @@ fun AdminComplaintDetailScreen(
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
+
+                // Timeline Section
+                ComplaintTimeline(
+                    currentStatus = complaint.status,
+                    timestamps = complaint.timestamps,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Dispute Info Card (Admin View)
+                if (complaint.status.lowercase() == "disputed") {
+                    DisputeInfoCard(
+                        complaint = complaint,
+                        isAdmin = true,
+                        onResolveClick = { action ->
+                            viewModel.resolveDispute(complaintId, action) {
+                                viewModel.fetchComplaint(complaintId, userId)
+                                viewModel.fetchAdminComplaints(userId)
+                            }
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                } else if (complaint.status.lowercase() == "pending_verification") {
+                    // Show a summary for admin about verification status
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Pending Community Verification", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            val count = complaint.verificationCount ?: 0
+                            Text("Currently $count/3 citizens have verified this resolution.", style = MaterialTheme.typography.bodySmall)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = { count / 3f },
+                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
 
                 // Admin Controls
                 Box(

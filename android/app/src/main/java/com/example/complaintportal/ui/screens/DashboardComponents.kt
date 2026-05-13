@@ -179,14 +179,25 @@ fun ComplaintCard(
                 // Status Badge
                 val statusClean = complaint.status.trim().lowercase()
                 val statusColor = when (statusClean) {
-                    "resolved" -> MaterialTheme.colorScheme.secondaryContainer
-                    "in_progress" -> MaterialTheme.colorScheme.tertiaryContainer
+                    "resolved", "confirmed_resolved" -> MaterialTheme.colorScheme.secondaryContainer
+                    "in_progress", "re_opened" -> MaterialTheme.colorScheme.tertiaryContainer
+                    "disputed" -> MaterialTheme.colorScheme.errorContainer
                     else -> MaterialTheme.colorScheme.primaryContainer
                 }
                 val onStatusColor = when (statusClean) {
-                    "resolved" -> MaterialTheme.colorScheme.onSecondaryContainer
-                    "in_progress" -> MaterialTheme.colorScheme.onTertiaryContainer
+                    "resolved", "confirmed_resolved" -> MaterialTheme.colorScheme.onSecondaryContainer
+                    "in_progress", "re_opened" -> MaterialTheme.colorScheme.onTertiaryContainer
+                    "disputed" -> MaterialTheme.colorScheme.onErrorContainer
                     else -> MaterialTheme.colorScheme.onPrimaryContainer
+                }
+
+                val displayStatus = when (statusClean) {
+                    "pending_verification" -> "VERIFICATION"
+                    "confirmed_resolved"   -> "VERIFIED"
+                    "under_review"         -> "REVIEW"
+                    "in_progress"          -> "IN PROGRESS"
+                    "re_opened"            -> "RE-OPENED"
+                    else -> statusClean.uppercase()
                 }
 
                 Box(
@@ -197,7 +208,7 @@ fun ComplaintCard(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = complaint.status.uppercase(),
+                        text = displayStatus,
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                         fontWeight = FontWeight.Bold,
                         color = onStatusColor

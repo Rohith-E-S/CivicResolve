@@ -442,3 +442,32 @@ export const updateHomeDistrict = async (req, res) => {
     });
   }
 };
+
+// -------------------------------------------------------------
+// UPDATE USER LOCATION (called from Android periodically)
+// -------------------------------------------------------------
+export const updateUserLocation = async (req, res) => {
+  try {
+    const { latitude, longitude } = req.body;
+
+    if (latitude === undefined || longitude === undefined) {
+      return res.status(400).json({ success: false, message: "latitude and longitude are required" });
+    }
+
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return res.status(400).json({ success: false, message: "Invalid coordinates" });
+    }
+
+    await User.findByIdAndUpdate(req.user._id, {
+      lastLocation: { type: "Point", coordinates: [lng, lat] }, // GeoJSON: [lng, lat]
+      lastLocationUpdatedAt: new Date(),
+    });
+
+    return res.status(200).json({ success: true, message: "Location updated" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

@@ -32,6 +32,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -123,6 +124,7 @@ fun UserDashboardScreen(
     var selectedFilter by rememberSaveable { mutableStateOf("All") }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) } // 0: My Reports, 1: Community Hub
     var communityTabScope by rememberSaveable { mutableIntStateOf(0) } // 0: My District, 1: Global Feed
+    var hideMyReports by rememberSaveable { mutableStateOf(false) }
     var isMapView by rememberSaveable { mutableStateOf(false) }
     val NavyPrimary = Color(0xFF1A3A6E)
     val coroutineScope = rememberCoroutineScope()
@@ -164,6 +166,15 @@ fun UserDashboardScreen(
         } else {
             viewModel.fetchUserComplaints(userId)
             viewModel.fetchPublicStats()
+        }
+    }
+
+    // Sync user GPS to backend whenever location is acquired (powers 1km proximity notifications)
+    LaunchedEffect(userLat, userLng) {
+        val lat = userLat
+        val lng = userLng
+        if (lat != null && lng != null) {
+            authViewModel.updateUserLocation(lat, lng)
         }
     }
 
@@ -416,44 +427,70 @@ fun UserDashboardScreen(
                 }
             }
 
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.primary,
-                divider = {},
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                },
-                modifier = Modifier.padding(horizontal = 16.dp)
+            @OptIn(ExperimentalMaterial3Api::class)
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.CenterEnd
             ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { 
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        selectedTab = 0 
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    divider = {},
+                    indicator = { tabPositions ->
+                        if (selectedTab < tabPositions.size) {
+                            TabRowDefaults.SecondaryIndicator(
+                                Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     },
-                    text = { Text(stringResource(R.string.my_reports), style = MaterialTheme.typography.titleSmall, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium) }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { 
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        selectedTab = 1 
-                    },
-                    text = { Text(stringResource(R.string.community_hub), style = MaterialTheme.typography.titleSmall, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium) }
-                )
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                ) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            selectedTab = 0 
+                        },
+                        text = { Text(stringResource(R.string.my_reports), style = MaterialTheme.typography.titleSmall, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium) }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            selectedTab = 1 
+                        },
+                        text = { Text(stringResource(R.string.community_hub), style = MaterialTheme.typography.titleSmall, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium) }
+                    )
+                }
+
+                if (selectedTab == 1) {
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = {
+                            PlainTooltip {
+                                Text("Hide my reports")
+                            }
+                        },
+                        state = rememberTooltipState()
+                    ) {
+                        Switch(
+                            checked = hideMyReports,
+                            onCheckedChange = { hideMyReports = it },
+                            modifier = Modifier.scale(0.8f).padding(end = 8.dp)
+                        )
+                    }
+                }
             }
 
             val communityFiltered = state.communityComplaints.filter { it.user?.id != userId }
             
             if (isMapView) {
                 val mapBaseList = if (selectedTab == 0) {
-                    state.newComplaints + state.inProgressComplaints + state.resolvedComplaints
+                    state.newComplaints + state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints + state.resolvedComplaints
                 } else {
-                    state.communityComplaints
+                    if (hideMyReports) state.communityComplaints.filter { it.user?.id != userId } else state.communityComplaints
                 }
                 
                 val mapFilteredList = if (searchQuery.isBlank()) {
@@ -482,19 +519,33 @@ fun UserDashboardScreen(
                 )
             } else {
                 val complaints = if (selectedTab == 0) {
-                    state.newComplaints + state.inProgressComplaints + state.resolvedComplaints
+                    state.newComplaints + state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints + state.resolvedComplaints
                 } else {
                     state.communityComplaints
                 }
 
-                val filteredByStatus by remember(selectedFilter, complaints) {
+                val baseList = remember(complaints, selectedTab, hideMyReports) {
+                    if (selectedTab == 1 && hideMyReports) {
+                        complaints.filter { it.user?.id != userId }
+                    } else {
+                        complaints
+                    }
+                }
+
+                val filteredByStatus by remember(selectedFilter, baseList) {
                     derivedStateOf {
                         when (selectedFilter) {
-                            "All"      -> complaints
-                            "New"      -> complaints.filter { it.status.lowercase() == "new" || it.status.lowercase() == "under_review" }
-                            "Active"   -> complaints.filter { it.status.lowercase() == "in_progress" }
-                            "Resolved" -> complaints.filter { it.status.lowercase() == "resolved" }
-                            else       -> complaints
+                            "All"      -> baseList
+                            "New"      -> baseList.filter { it.status.lowercase() == "new" || it.status.lowercase() == "under_review" }
+                            "Active"   -> baseList.filter {
+                                val s = it.status.lowercase()
+                                s == "in_progress" || s == "re_opened" || s == "disputed"
+                            }
+                            "Resolved" -> baseList.filter {
+                                val s = it.status.lowercase()
+                                s == "resolved" || s == "confirmed_resolved" || s == "pending_verification"
+                            }
+                            else       -> baseList
                         }
                     }
                 }
@@ -507,28 +558,34 @@ fun UserDashboardScreen(
                 ) {
                     StatusChip(
                         label      = "All",
-                        count      = complaints.size,
+                        count      = baseList.size,
                         color      = NavyPrimary,
                         isSelected = selectedFilter == "All",
                         onClick    = { selectedFilter = "All" },
                     )
                     StatusChip(
                         label      = "New",
-                        count      = complaints.count { it.status.lowercase() == "new" || it.status.lowercase() == "under_review" },
+                        count      = baseList.count { it.status.lowercase() == "new" || it.status.lowercase() == "under_review" },
                         color      = Color(0xFFE53935),
                         isSelected = selectedFilter == "New",
                         onClick    = { selectedFilter = "New" },
                     )
                     StatusChip(
                         label      = "Active",
-                        count      = complaints.count { it.status.lowercase() == "in_progress" },
+                        count      = baseList.count {
+                            val s = it.status.lowercase()
+                            s == "in_progress" || s == "re_opened" || s == "disputed"
+                        },
                         color      = Color(0xFFE67E22),
                         isSelected = selectedFilter == "Active",
                         onClick    = { selectedFilter = "Active" },
                     )
                     StatusChip(
                         label      = "Resolved",
-                        count      = complaints.count { it.status.lowercase() == "resolved" },
+                        count      = baseList.count {
+                            val s = it.status.lowercase()
+                            s == "resolved" || s == "confirmed_resolved" || s == "pending_verification"
+                        },
                         color      = Color(0xFF1D9E75),
                         isSelected = selectedFilter == "Resolved",
                         onClick    = { selectedFilter = "Resolved" },
@@ -603,6 +660,10 @@ fun UserDashboardScreen(
                             }
                         }
                     }
+                }
+
+                if (selectedTab == 1) {
+                    // Switch removed from here
                 }
 
                 @OptIn(ExperimentalMaterial3Api::class)

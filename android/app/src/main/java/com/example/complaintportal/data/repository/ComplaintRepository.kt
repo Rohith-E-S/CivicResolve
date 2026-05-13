@@ -203,4 +203,52 @@ class ComplaintRepository(private val apiService: ApiService) {
             Result.failure(e)
         }
     }
+
+    suspend fun verifyComplaint(id: String, lat: Double, lng: Double): Result<SingleComplaintResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.verifyComplaint(id, mapOf("latitude" to lat, "longitude" to lng))
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorMsg = parseError(response.errorBody()?.string())
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun disputeComplaint(
+        id: String,
+        lat: RequestBody,
+        lng: RequestBody,
+        description: RequestBody,
+        photo: MultipartBody.Part
+    ): Result<SingleComplaintResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.disputeComplaint(id, lat, lng, description, photo)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorMsg = parseError(response.errorBody()?.string())
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun resolveDispute(id: String, action: String): Result<SingleComplaintResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.resolveDispute(id, mapOf("action" to action))
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorMsg = parseError(response.errorBody()?.string())
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

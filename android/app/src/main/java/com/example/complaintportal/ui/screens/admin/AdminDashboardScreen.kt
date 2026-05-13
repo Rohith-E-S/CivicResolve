@@ -122,7 +122,7 @@ fun AdminDashboardScreen(
             
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
                 AdminStatsBar(
-                    totalCount    = (state.newComplaints + state.inProgressComplaints + state.resolvedComplaints).size,
+                    totalCount    = (state.newComplaints + state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints + state.resolvedComplaints).size,
                     newCount      = state.newComplaints.size,
                     activeCount   = state.inProgressComplaints.size,
                     resolvedCount = state.resolvedComplaints.size,
@@ -299,7 +299,7 @@ fun AdminDashboardScreen(
                 item {
                     StatCard(
                         title = "Active",
-                        count = state.inProgressComplaints.size.toString(),
+                        count = (state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints).size.toString(),
                         color = androidx.compose.ui.graphics.Color(0xFFE67E22),
                         isSelected = pagerState.currentPage == 1,
                         onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } }
@@ -331,7 +331,7 @@ fun AdminDashboardScreen(
             ) { page ->
                     val list = when (page) {
                             0 -> state.newComplaints
-                            1 -> state.inProgressComplaints
+                            1 -> state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints
                             2 -> state.resolvedComplaints
                             else -> emptyList()
                         }

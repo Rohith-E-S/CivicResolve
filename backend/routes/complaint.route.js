@@ -22,6 +22,9 @@ import {
   getPublicStats,
   getPublicFeed,
   analyzeImage,
+  verifyComplaint,
+  disputeComplaint,
+  resolveDispute,
 } from "../controllers/complaint.controller.js";
 import { getAdminAnalytics, getUserAnalytics } from "../controllers/analytics.controller.js";
 
@@ -71,5 +74,10 @@ complaintRouter.delete("/:id", protectRoute, deleteMyComplaint);
 complaintRouter.post("/support/:id", protectRoute, supportComplaint);
 complaintRouter.get("/analytics/admin", protectRoute, getAdminAnalytics);
 complaintRouter.get("/analytics/user", protectRoute, getUserAnalytics);
+
+// Community Verification & Disputes
+complaintRouter.post("/verify/:id", protectRoute, verifyComplaint);
+complaintRouter.post("/dispute/:id", protectRoute, upload.single("disputePhoto"), disputeComplaint);
+complaintRouter.patch("/dispute/resolve/:id", protectRoute, resolveDispute);
 
 export default complaintRouter;
