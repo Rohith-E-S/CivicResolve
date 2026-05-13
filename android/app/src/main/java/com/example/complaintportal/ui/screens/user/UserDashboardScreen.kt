@@ -466,7 +466,14 @@ fun UserDashboardScreen(
                 val mapBaseList = if (selectedTab == 0) {
                     state.newComplaints + state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints + state.resolvedComplaints
                 } else {
-                    if (hideMyReports) state.communityComplaints.filter { it.user?.id != userId } else state.communityComplaints
+                    var filtered = state.communityComplaints
+                    if (hideMyReports) {
+                        filtered = filtered.filter { it.user?.id != userId }
+                    }
+                    if (communityTabScope == 0 && district != null) {
+                        filtered = filtered.filter { it.city.equals(district, ignoreCase = true) }
+                    }
+                    filtered
                 }
                 
                 val mapFilteredList = if (searchQuery.isBlank()) {
@@ -500,12 +507,17 @@ fun UserDashboardScreen(
                     state.communityComplaints
                 }
 
-                val baseList = remember(complaints, selectedTab, hideMyReports) {
-                    if (selectedTab == 1 && hideMyReports) {
-                        complaints.filter { it.user?.id != userId }
-                    } else {
-                        complaints
+                val baseList = remember(complaints, selectedTab, hideMyReports, communityTabScope, district) {
+                    var filtered = complaints
+                    if (selectedTab == 1) {
+                        if (hideMyReports) {
+                            filtered = filtered.filter { it.user?.id != userId }
+                        }
+                        if (communityTabScope == 0 && district != null) {
+                            filtered = filtered.filter { it.city.equals(district, ignoreCase = true) }
+                        }
                     }
+                    filtered
                 }
 
                 val filteredByStatus by remember(selectedFilter, baseList) {
