@@ -16,15 +16,27 @@ fun MapViewScreen(
     viewModel: ComplaintViewModel,
     isAdmin: Boolean,
     userId: String,
+    statusFilter: String? = null,
     onNavigateBack: () -> Unit,
     onNavigateToDetail: (String) -> Unit
 ) {
     val state by viewModel.state.collectAsState()
     
-    val complaints = if (isAdmin) {
-        state.newComplaints + state.inProgressComplaints + state.resolvedComplaints
+    val baseComplaints = if (isAdmin) {
+        state.newComplaints + state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints + state.resolvedComplaints
     } else {
-        (state.newComplaints + state.inProgressComplaints + state.resolvedComplaints + state.communityComplaints).distinctBy { it.id }
+        (state.newComplaints + state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints + state.resolvedComplaints + state.communityComplaints).distinctBy { it.id }
+    }
+
+    val complaints = if (statusFilter == null || statusFilter == "All") {
+        baseComplaints
+    } else {
+        when (statusFilter) {
+            "New" -> state.newComplaints
+            "Active" -> state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints
+            "Resolved" -> state.resolvedComplaints
+            else -> baseComplaints
+        }
     }
     
     Scaffold(

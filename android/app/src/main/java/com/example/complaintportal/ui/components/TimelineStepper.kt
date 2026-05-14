@@ -242,16 +242,14 @@ private fun buildSteps(status: String, ts: ComplaintTimestamps?): List<TimelineS
     val s = status.lowercase()
 
     // Map every backend status to a step index (0-based)
-    val currentIdx = when (s) {
-        "new", "under_review"  -> 0   // still at "Reported"
-        "in_progress",
-        "re_opened"            -> 1   // field work happening
-        "pending_verification",
-        "disputed"             -> 2   // admin resolved, awaiting community
-        "resolved",
-        "confirmed_resolved"   -> 3   // citizens confirmed it
-        else                   -> 0
+    val currentIdx = when {
+        s == "resolved" || s == "confirmed_resolved" -> 3
+        s == "pending_verification" || s == "disputed" -> 2
+        s == "in_progress" || s == "re_opened" || ts?.reopened != null -> 1
+        else -> 0
     }
+
+    val isReopened = s == "re_opened" || ts?.reopened != null
 
     fun stepState(stepIdx: Int) = when {
         currentIdx > stepIdx  -> StepState.COMPLETED
@@ -271,12 +269,12 @@ private fun buildSteps(status: String, ts: ComplaintTimestamps?): List<TimelineS
 
         // ── Step 1: In Progress ──────────────────────────────
         TimelineStep(
-            label       = if (s == "re_opened") "Re-opened" else "In Progress",
-            description = if (s == "re_opened")
+            label       = if (isReopened) "Re-opened" else "In Progress",
+            description = if (isReopened)
                               "Issue re-opened after citizen dispute"
                           else
                               "Admin assigned — field team working on it",
-            icon        = if (s == "re_opened") Icons.Default.Replay else Icons.Default.Build,
+            icon        = if (isReopened) Icons.Default.Replay else Icons.Default.Build,
             timestamp   = ts?.inProgress ?: ts?.reopened,
             state       = stepState(1),
         ),

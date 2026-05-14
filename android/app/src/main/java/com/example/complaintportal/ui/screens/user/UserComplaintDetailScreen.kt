@@ -55,6 +55,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import android.content.pm.PackageManager
 import kotlinx.coroutines.tasks.await
 
@@ -70,6 +71,7 @@ fun UserComplaintDetailScreen(
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     var showZoomDialog by remember { mutableStateOf<String?>(null) }
+    var showSuccessAnimation by remember { mutableStateOf(false) }
 
     LaunchedEffect(complaintId) {
         viewModel.fetchComplaint(complaintId, userId)
@@ -160,24 +162,11 @@ fun UserComplaintDetailScreen(
                     Column {
                         Box(modifier = Modifier.fillMaxWidth().height(240.dp)) {
                             if (!complaint.beforeImageUrl.isNullOrBlank()) {
-                                val sharedTransitionScope = com.example.complaintportal.ui.navigation.LocalSharedTransitionScope.current
-                                val animatedVisibilityScope = com.example.complaintportal.ui.navigation.LocalNavAnimatedVisibilityScope.current
-                                var imageModifier = Modifier.fillMaxSize().clickable { showZoomDialog = complaint.beforeImageUrl }
-                                
-                                if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                                    with(sharedTransitionScope) {
-                                        imageModifier = imageModifier.sharedElement(
-                                            rememberSharedContentState(key = "image-${complaint.id}"),
-                                            animatedVisibilityScope = animatedVisibilityScope
-                                        )
-                                    }
-                                }
-
                                 Image(
                                     painter = rememberAsyncImagePainter(complaint.beforeImageUrl),
                                     contentDescription = stringResource(R.string.complaint_image),
                                     contentScale = ContentScale.Crop,
-                                    modifier = imageModifier
+                                    modifier = Modifier.fillMaxSize().clickable { showZoomDialog = complaint.beforeImageUrl }
                                 )
                             } else {
                                 Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
@@ -221,6 +210,42 @@ fun UserComplaintDetailScreen(
                                 Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("${complaint.landmark}, ${complaint.city}, ${complaint.state}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+                
+                // Re-opened Status Banner
+                if (complaint.status.lowercase() == "re_opened") {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f))
+                            .border(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                            .padding(16.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Replay, 
+                                contentDescription = null, 
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    "Issue Re-opened", 
+                                    style = MaterialTheme.typography.titleSmall, 
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    "Admin has reopened this issue for further action after your dispute.", 
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
@@ -288,13 +313,17 @@ fun UserComplaintDetailScreen(
 
                 var showDisputeDialog by remember { mutableStateOf(false) }
 
+                val hasAlreadyVerified = complaint.verifications?.any { it.userId == userId } ?: false
+
                 if (status == "pending_verification") {
                     VerificationCard(
                         complaint = complaint,
                         isWithinRange = isWithinRange,
+                        hasAlreadyVerified = hasAlreadyVerified,
                         isLoading = state.verifyLoading,
                         onVerifyClick = {
                             viewModel.verifyComplaint(complaint.id, userLat ?: 0.0, userLng ?: 0.0) {
+                                showSuccessAnimation = true
                                 viewModel.fetchComplaint(complaintId, userId)
                             }
                         },
@@ -333,6 +362,7 @@ fun UserComplaintDetailScreen(
 
                             viewModel.disputeComplaint(complaint.id, latBody, lngBody, descBody, body) {
                                 showDisputeDialog = false
+                                showSuccessAnimation = true
                                 viewModel.fetchComplaint(complaintId, userId)
                             }
                         },
@@ -358,26 +388,27 @@ fun UserComplaintDetailScreen(
                     }
                 }
 
+                // Before & After Comparison Section
                 if (!complaint.afterImageUrl.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(24.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                            .padding(24.dp)
-                    ) {
-                        Column {
-                            Text(stringResource(R.string.resolution_proof), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Image(
-                                painter = rememberAsyncImagePainter(complaint.afterImageUrl),
-                                contentDescription = stringResource(R.string.after_image),
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(12.dp)).clickable { showZoomDialog = complaint.afterImageUrl }
-                            )
-                        }
-                    }
+                    Text(
+                        stringResource(R.string.before_after_comparison),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    com.example.complaintportal.ui.components.BeforeAfterSlider(
+                        beforeImageUrl = complaint.beforeImageUrl ?: "",
+                        afterImageUrl = complaint.afterImageUrl ?: "",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.drag_slider_transformation),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
                 }
 
                 if (complaint.status.equals("resolved", ignoreCase = true)) {
@@ -462,6 +493,12 @@ fun UserComplaintDetailScreen(
                 }
             }
         }
+        
+        if (showSuccessAnimation) {
+            com.example.complaintportal.ui.components.SuccessAnimation(
+                onAnimationFinished = { showSuccessAnimation = false }
+            )
+        }
     }
 }
 
@@ -474,11 +511,30 @@ fun DisputeSubmissionDialog(
 ) {
     var description by remember { mutableStateOf("") }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
-    
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        selectedImageUri = uri
+    val context = LocalContext.current
+
+    // Camera file + URI via FileProvider (camera-only, no gallery)
+    val cameraImageFile = remember {
+        File(context.cacheDir, "dispute_photo_${System.currentTimeMillis()}.jpg")
+    }
+    val cameraImageUri = remember {
+        FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            cameraImageFile
+        )
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success: Boolean ->
+        if (success) selectedImageUri = cameraImageUri
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) cameraLauncher.launch(cameraImageUri)
     }
 
     AlertDialog(
@@ -514,10 +570,19 @@ fun DisputeSubmissionDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp)
+                        .height(140.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable { launcher.launch("image/*") },
+                        .clickable {
+                            val hasCameraPermission = ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.CAMERA
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (hasCameraPermission) {
+                                cameraLauncher.launch(cameraImageUri)
+                            } else {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     if (selectedImageUri != null) {
@@ -529,9 +594,23 @@ fun DisputeSubmissionDialog(
                         )
                     } else {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Add Photo Evidence", style = MaterialTheme.typography.labelSmall)
+                            Icon(
+                                Icons.Default.CameraAlt,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Take Photo Evidence",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                "Camera only — live photo required",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }

@@ -12,7 +12,7 @@ import notificationRouter from "./routes/notification.route.js";
 import { socketAuth } from "./middleware/socket.auth.js";
 import Message from "./models/message.model.js";
 import Complaint from "./models/complaint.model.js";
-import { notifyAdminComment } from "./services/notificationService.js";
+import { notifyAdminComment, notifyAdminNewMessage } from "./services/notificationService.js";
 
 dotenv.config();
 
@@ -23,7 +23,7 @@ const PORT = process.env.PORT || 4000;
 // Socket.IO setup with CORS
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: ["http://localhost:5173", "http://localhost:5174", "http://10.36.100.29:4000"],
     credentials: true,
   },
 });
@@ -37,6 +37,11 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 app.use(urlencoded({ extended: true }));
+
+app.use((req, res, next) => {
+  console.log(`[Global] ${req.method} ${req.url}`);
+  next();
+});
 
 app.get("/", (req, res) => {
   res.send("Server running ");
@@ -55,12 +60,14 @@ io.use(socketAuth);
 
 // Socket.IO event handlers
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.user.fullName);
+  console.log("User connected:", socket.user.fullName, "ID:", socket.id);
 
   // Join user's personal notification room so targeted emits work
   socket.on("join_room", (userId) => {
-    socket.join(userId.toString());
-    console.log(`[Socket] ${socket.user.fullName} joined notification room: ${userId}`);
+    if (!userId) return;
+    const room = userId.toString();
+    socket.join(room);
+    console.log(`[Socket] ${socket.user.fullName} joined notification room: ${room}`);
   });
 
   // Join complaint room
@@ -90,17 +97,53 @@ io.on("connection", (socket) => {
       // Broadcast to room
       io.to(complaintId).emit("newMessage", populatedMessage);
 
-      // Notify user if sender is Admin
-      if (socket.user.isAdmin) {
-        const complaint = await Complaint.findById(complaintId);
-        if (complaint) {
+      // Notify recipient
+      const complaint = await Complaint.findById(complaintId);
+      if (complaint) {
+        if (socket.user.isAdmin) {
+          // Admin -> User: notify the complaint owner
           await notifyAdminComment(io, {
-            complaintOwnerId: toUser,
+            complaintOwnerId: complaint.user.toString(),
             complaintId,
             adminName: socket.user.fullName,
             commentPreview: message,
             category: complaint.category
           });
+        } else {
+          // User -> Admin: find the real district admins for this complaint's city
+          const User = (await import("./models/user.model.js")).default;
+          const allAdmins = await User.find({ isAdmin: true }).select("_id homeDistrict fullName");
+          const city = (complaint.city || "").toLowerCase();
+
+          const districtAdmins = allAdmins.filter(admin => {
+            if (!admin.homeDistrict || admin.homeDistrict.trim() === "") return true; // Global admin
+            const d = admin.homeDistrict.toLowerCase().trim();
+            const c = city.trim();
+
+            // Exact / substring matches (both directions)
+            if (d === "all" || d.includes(c) || c.includes(d)) return true;
+
+            // Extract core district word (e.g. "Jalandhar" from "Jalandhar Division")
+            const coreDistrict = d.split(/\s+/)[0];
+            if (coreDistrict && c.includes(coreDistrict)) return true;
+
+            return false;
+          });
+
+          // Fallback: if no district admin matched, notify ALL admins so messages are never lost
+          const adminsToNotify = districtAdmins.length > 0 ? districtAdmins : allAdmins;
+
+          console.log(`[Chat] User message for complaint in ${complaint.city}. Notifying ${adminsToNotify.length} admins (matched: ${districtAdmins.length}).`);
+
+          for (const admin of adminsToNotify) {
+            await notifyAdminNewMessage(io, {
+              adminId: admin._id,
+              complaintId,
+              userName: socket.user.fullName,
+              messagePreview: message,
+              category: complaint.category
+            });
+          }
         }
       }
     } catch (error) {

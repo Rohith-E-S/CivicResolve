@@ -129,6 +129,12 @@ fun UserDashboardScreen(
     val NavyPrimary = Color(0xFF1A3A6E)
     val coroutineScope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+
+    // Scroll to top when tab or scope changes
+    LaunchedEffect(selectedTab, communityTabScope) {
+        lazyListState.scrollToItem(0)
+    }
 
     val onRefresh = {
         val hasLocationPermission = androidx.core.content.ContextCompat.checkSelfPermission(
@@ -181,6 +187,12 @@ fun UserDashboardScreen(
     LaunchedEffect(selectedTab, communityTabScope) {
         if (selectedTab == 1) {
             val scope = if (communityTabScope == 0) (district ?: "all") else "all"
+            
+            // Reset sort if it was set to NEAREST and we are switching to Global Feed (scope 1)
+            if (communityTabScope == 1 && state.sortOption == SortOption.NEAREST) {
+                viewModel.updateSortOption(SortOption.DATE_DESC)
+            }
+            
             viewModel.fetchCommunityFeed(scope, userId)
             viewModel.fetchPublicStats(scope)
         } else {
@@ -188,7 +200,7 @@ fun UserDashboardScreen(
             if (state.sortOption == SortOption.NEAREST) {
                 viewModel.updateSortOption(SortOption.DATE_DESC)
             }
-            viewModel.fetchUserComplaints(userId) // Added this
+            viewModel.fetchUserComplaints(userId) 
             viewModel.fetchPublicStats()
         }
     }
@@ -406,6 +418,7 @@ fun UserDashboardScreen(
                 SortFilterDropdown(
                     selectedSort = state.sortOption,
                     activeTab = if (selectedTab == 1) 0 else 1,
+                    showNearest = (selectedTab == 1 && communityTabScope == 0),
                     onSortChanged = { viewModel.updateSortOption(it) }
                 )
 
@@ -463,7 +476,7 @@ fun UserDashboardScreen(
             val communityFiltered = state.communityComplaints.filter { it.user?.id != userId }
             
             if (isMapView) {
-                val mapBaseList = if (selectedTab == 0) {
+                val mapBaseList = (if (selectedTab == 0) {
                     state.newComplaints + state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints + state.resolvedComplaints
                 } else {
                     var filtered = state.communityComplaints
@@ -471,9 +484,25 @@ fun UserDashboardScreen(
                         filtered = filtered.filter { it.user?.id != userId }
                     }
                     if (communityTabScope == 0 && district != null) {
-                        filtered = filtered.filter { it.city.equals(district, ignoreCase = true) }
+                        filtered = filtered.filter { 
+                            it.city.contains(district, ignoreCase = true) || 
+                            district.contains(it.city, ignoreCase = true)
+                        }
                     }
                     filtered
+                }).let { list ->
+                    when (selectedFilter) {
+                        "New" -> list.filter { it.status.lowercase() == "new" || it.status.lowercase() == "under_review" }
+                        "Active" -> list.filter {
+                            val s = it.status.lowercase()
+                            s == "in_progress" || s == "re_opened" || s == "disputed"
+                        }
+                        "Resolved" -> list.filter {
+                            val s = it.status.lowercase()
+                            s == "resolved" || s == "confirmed_resolved" || s == "pending_verification"
+                        }
+                        else -> list
+                    }
                 }
                 
                 val mapFilteredList = if (searchQuery.isBlank()) {
@@ -514,7 +543,10 @@ fun UserDashboardScreen(
                             filtered = filtered.filter { it.user?.id != userId }
                         }
                         if (communityTabScope == 0 && district != null) {
-                            filtered = filtered.filter { it.city.equals(district, ignoreCase = true) }
+                            filtered = filtered.filter { 
+                                it.city.contains(district, ignoreCase = true) || 
+                                district.contains(it.city, ignoreCase = true)
+                            }
                         }
                     }
                     filtered
@@ -689,19 +721,24 @@ fun UserDashboardScreen(
                             SortOption.RATING_DESC -> unsorted.sortedByDescending { it.rating }
                             SortOption.UPVOTES_DESC -> unsorted.sortedByDescending { it.supportCount ?: 0 }
                             SortOption.NEAREST -> {
-                                val mapped: List<Pair<Complaint, Double>> = unsorted.map { complaint ->
-                                    val lat = complaint.latitude.toDoubleOrNull() ?: 0.0
-                                    val lng = complaint.longitude.toDoubleOrNull() ?: 0.0
-                                    val uLat = userLat ?: 0.0
-                                    val uLng = userLng ?: 0.0
-                                    val dist = haversineDistance(uLat, uLng, lat, lng)
-                                    Pair(complaint, dist)
-                                }
-                                val sorted = mapped.sortedBy { it.second }
-                                if (showAllBeyond || userLat == null) {
-                                    sorted.map { it.first }
+                                if (selectedTab == 1 && communityTabScope == 0) {
+                                    val mapped: List<Pair<Complaint, Double>> = unsorted.map { complaint ->
+                                        val lat = complaint.latitude.toDoubleOrNull() ?: 0.0
+                                        val lng = complaint.longitude.toDoubleOrNull() ?: 0.0
+                                        val uLat = userLat ?: 0.0
+                                        val uLng = userLng ?: 0.0
+                                        val dist = haversineDistance(uLat, uLng, lat, lng)
+                                        Pair(complaint, dist)
+                                    }
+                                    val sorted = mapped.sortedBy { it.second }
+                                    if (showAllBeyond || userLat == null) {
+                                        sorted.map { it.first }
+                                    } else {
+                                        sorted.filter { it.second <= 5000.0 }.map { it.first }
+                                    }
                                 } else {
-                                    sorted.filter { it.second <= 5000.0 }.map { it.first }
+                                    // Fallback to newest first if Nearest is somehow active elsewhere
+                                    unsorted.sortedByDescending { it.createdAt }
                                 }
                             }
                         }
@@ -716,6 +753,7 @@ fun UserDashboardScreen(
                     } else 0
 
                     LazyColumn(
+                        state = lazyListState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -789,7 +827,7 @@ fun UserDashboardScreen(
                                             val lng = complaint.longitude.toDoubleOrNull() ?: 0.0
                                             haversineDistance(userLat!!, userLng!!, lat, lng)
                                         } else null,
-                                        showDistance = selectedTab == 1 && district != null && (
+                                        showDistance = selectedTab == 1 && communityTabScope == 0 && district != null && (
                                             complaint.city.contains(district, ignoreCase = true) || 
                                             district.contains(complaint.city, ignoreCase = true)
                                         ),

@@ -29,13 +29,9 @@ interface AppContainer {
 }
 
 class DefaultAppContainer(private val context: Context) : AppContainer {
-    // For Emulator: http://10.0.2.2:4000
-    // For Physical Device: http://YOUR_IP_ADDRESS:4000
-    //override val socketUrl = "https://nonadjacent-unsurnamed-lizabeth.ngrok-free.dev"
-    override val socketUrl = "http://10.0.2.2:4000"
-    
+    override val socketUrl = "http://localhost:4000"
     override val baseUrl = "$socketUrl/api/"
-    
+    //override val socketUrl = "https://nonadjacent-unsurnamed-lizabeth.ngrok-free.dev"
     override val moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
         .build()

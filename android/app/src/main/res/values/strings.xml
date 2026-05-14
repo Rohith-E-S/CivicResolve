@@ -202,4 +202,6 @@
     <string name="my_activity">MY ACTIVITY</string>
     <string name="upvoted_posts">Upvoted Posts</string>
     <string name="my_analytics">My Analytics</string>
+    <string name="before_after_comparison">Before &amp; After Comparison</string>
+    <string name="drag_slider_transformation">Drag the slider to see the transformation</string>
 </resources>

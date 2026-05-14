@@ -144,7 +144,7 @@ fun OsmDashboardMap(
                     val lat = it.latitude.toDoubleOrNull()
                     val lng = it.longitude.toDoubleOrNull()
                     lat != null && lng != null && 
-                    lat in 29.5..32.5 && lng in 73.5..77.0
+                    lat in 28.5..34.0 && lng in 73.0..77.5
                 }
 
                 validComplaints.forEach { complaint ->
@@ -157,9 +157,11 @@ fun OsmDashboardMap(
                     marker.snippet = "${complaint.city}, ${complaint.state}"
                     
                     val markerColor = when (complaint.status.lowercase()) {
-                        "new" -> android.graphics.Color.RED
-                        "in_progress" -> android.graphics.Color.parseColor("#FFB74D")
-                        "resolved" -> android.graphics.Color.parseColor("#81C784")
+                        "new", "under_review" -> android.graphics.Color.RED
+                        "in_progress", "re_opened" -> android.graphics.Color.parseColor("#FFB74D")
+                        "pending_verification" -> android.graphics.Color.parseColor("#E67E22") // Orange
+                        "disputed" -> android.graphics.Color.parseColor("#9C27B0") // Purple
+                        "resolved", "confirmed_resolved" -> android.graphics.Color.parseColor("#1D9E75") // CivicResolve Green
                         else -> android.graphics.Color.GRAY
                     }
                     
