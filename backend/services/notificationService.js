@@ -9,7 +9,11 @@ export async function createNotification(io, { userId, type, title, message, com
     const notification = await Notification.create({ userId, type, title, message, complaintId, metadata });
 
     if (io) {
-      io.to(userId.toString()).emit("new_notification", {
+      const room = userId.toString();
+      const clients = io.sockets.adapter.rooms.get(room);
+      console.log(`[Socket] Sending ${type} to room ${room}. Listeners: ${clients ? clients.size : 0}`);
+
+      io.to(room).emit("new_notification", {
         _id: notification._id,
         type: notification.type,
         title: notification.title,
@@ -67,10 +71,21 @@ export async function notifyAdminComment(io, { complaintOwnerId, complaintId, ad
   return createNotification(io, {
     userId: complaintOwnerId,
     type: "admin_comment",
-    title: "Admin Replied to Your Report",
-    message: `${adminName} commented on your "${category}" report: "${commentPreview.slice(0, 60)}..."`,
+    title: "Message from Admin",
+    message: `${adminName} commented on your ${category} report: "${commentPreview}"`,
     complaintId,
     metadata: { adminName, commentPreview },
+  });
+}
+
+/** Notify admin that a resident sent a message */
+export async function notifyAdminNewMessage(io, { adminId, complaintId, userName, messagePreview, category }) {
+  return createNotification(io, {
+    userId: adminId,
+    type: "new_message",
+    title: "New Message from Resident",
+    message: `${userName} sent a message regarding ${category}: "${messagePreview}"`,
+    complaintId,
   });
 }
 
@@ -138,4 +153,68 @@ export async function notifyDisputeResolved(io, { userId, complaintId, category,
     message: `Admin reviewed your dispute for "${category}" and ${actionText} the issue.`,
     complaintId,
   });
+}
+
+/** 
+ * Notify all parties when a user verifies a report 
+ */
+export async function notifyVerificationDone(io, { verifierId, verifierName, reporterId, adminIds, complaintId, category, city }) {
+  console.log(`[Notification] Dispatching verification alerts for complaint ${complaintId}`);
+  console.log(`[Notification] Verifier: ${verifierId}, Reporter: ${reporterId}, Admins count: ${adminIds.length}`);
+
+  // 1. Notify Verifier (Thank you)
+  await createNotification(io, {
+    userId: verifierId,
+    type: "verified_by_you",
+    title: "Verification Complete",
+    message: "You have successfully verified this report. Thank you for your contribution!",
+    complaintId,
+  });
+
+  // 2. Notify Reporter (Only if they are not the verifier)
+  if (reporterId.toString() !== verifierId.toString()) {
+    console.log(`[Notification] Notifying reporter ${reporterId}`);
+    await createNotification(io, {
+      userId: reporterId,
+      type: "verified_by_peer",
+      title: "Your Report was Verified",
+      message: `${verifierName} has verified that your "${category}" issue in ${city} is resolved.`,
+      complaintId,
+      metadata: { verifierName }
+    });
+  } else {
+    console.log("[Notification] Verifier is reporter, skipping peer notification");
+  }
+
+  // 3. Notify Admins
+  const adminPromises = adminIds.map(adminId => {
+    console.log(`[Notification] Notifying admin ${adminId}`);
+    return createNotification(io, {
+      userId: adminId,
+      type: "admin_verification_alert",
+      title: "Citizen Verified Report",
+      message: `${verifierName} verified the "${category}" report in ${city}.`,
+      complaintId,
+      metadata: { verifierName, city }
+    });
+  });
+
+  return Promise.all(adminPromises);
+}
+
+/** Notify admins when a new report is filed in their district */
+export async function notifyAdminNewReport(io, { adminIds, complaintId, category, city }) {
+  const title = "New Report in Your Area";
+  const message = `A new ${category} report has been filed in ${city}.`;
+
+  console.log(`[Notification] Notifying ${adminIds.length} admins about new report in ${city}:`, adminIds);
+  for (const adminId of adminIds) {
+    await createNotification(io, {
+      userId: adminId,
+      type: "admin_new_report",
+      title,
+      message,
+      complaintId,
+    });
+  }
 }

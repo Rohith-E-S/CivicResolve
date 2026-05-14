@@ -4,8 +4,14 @@ import mongoose from "mongoose";
 
 export const getUserAnalytics = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userIdStr = req.user._id;
+    const userId = new mongoose.Types.ObjectId(userIdStr);
     const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
     const { period = "This Month" } = req.query;
 
     // Calculate date filter
@@ -81,16 +87,25 @@ export const getUserAnalytics = async (req, res) => {
     ]);
 
     const categories = categoryBreakdown.map(c => ({
-      label: c._id,
+      label: c._id || "Other",
       count: c.count
     }));
 
-    // 4. Community Rank (based on resolved count in the same city/district)
+    // 4. Community Rank
     const location = user.homeDistrict || complaints[0]?.city || "Global";
     
-    // Compare resolved counts of all users in the same district
+    // Improved location matching logic
+    let rankingMatch = { status: "resolved" };
+    if (location !== "Global") {
+      const words = location.split(/[\s,]+/).filter(w => w.length > 2);
+      if (words.length > 0) {
+        const pattern = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+        rankingMatch.city = new RegExp(pattern, "i");
+      }
+    }
+
     const rankingData = await Complaint.aggregate([
-      { $match: { status: "resolved", city: new RegExp(location, "i") } },
+      { $match: rankingMatch },
       {
         $group: {
           _id: "$user",
@@ -101,14 +116,13 @@ export const getUserAnalytics = async (req, res) => {
     ]);
 
     const totalParticipants = rankingData.length || 1;
-    const userRankIndex = rankingData.findIndex(r => r._id.toString() === userId.toString());
+    const userRankIndex = rankingData.findIndex(r => r._id?.toString() === userId.toString());
     
     // Calculate percentile rank (e.g., top 10%)
     let communityRankPct = 100;
     if (userRankIndex !== -1) {
       communityRankPct = Math.max(1, Math.round(((userRankIndex + 1) / totalParticipants) * 100));
     } else if (resolvedCount > 0) {
-        // If they have resolved something but weren't in the list for some reason
         communityRankPct = 50;
     }
 
@@ -129,6 +143,7 @@ export const getUserAnalytics = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("Analytics Error:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching analytics: " + error.message

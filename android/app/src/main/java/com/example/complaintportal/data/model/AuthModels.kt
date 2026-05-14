@@ -12,7 +12,9 @@ data class User(
     val address: String?,
     val homeDistrict: String?,
     val isAdmin: Boolean? = false,
-    val isVerified: Boolean? = false
+    val isVerified: Boolean? = false,
+    val civicPoints: Int? = 0,
+    val rank: String? = "citizen"
 )
 
 @JsonClass(generateAdapter = true)

@@ -57,10 +57,30 @@ data class UserProfile(
     val resolvedCount:Int       = 0,
     val upvotesCount: Int       = 0,
     val role:         String    = "Citizen Advocate",
+    val civicPoints:  Int       = 0,
+    val rank:         String    = "citizen",
     val initials:     String    = "",
     val notificationsEnabled: Boolean = true,
     val darkModeEnabled:      Boolean = false,
 )
+
+// Rank display helper
+fun String.toRankDisplay(): Pair<String, Color> = when (this) {
+    "neighborhood_watch" -> "👀 Neighborhood Watch" to Color(0xFF1565C0)
+    "community_hero"     -> "⭐ Community Hero"     to Color(0xFF7B1FA2)
+    "district_guardian"  -> "🏆 District Guardian"  to Color(0xFFE67E22)
+    "civic_champion"     -> "🎖️ Civic Champion"    to Color(0xFFE53935)
+    else                 -> "🌱 Citizen"             to Color(0xFF1D9E75)
+}
+
+// Points to next rank
+fun pointsToNextRank(current: Int): Pair<Int, Int> = when {
+    current < 50  -> current to 50
+    current < 150 -> current to 150
+    current < 350 -> current to 350
+    current < 700 -> current to 700
+    else          -> current to current  // max rank
+}
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
@@ -140,9 +160,21 @@ fun ProfileScreen(
         reportsCount = calculatedTotalReports,
         resolvedCount = calculatedResolvedCount,
         upvotesCount = calculatedTotalUpvotes,
+        civicPoints = user?.civicPoints ?: 0,
+        rank = user?.rank ?: "citizen",
         role = if (user?.isAdmin == true) stringResource(R.string.system_administrator) else stringResource(R.string.citizen_advocate),
         initials = user?.fullName?.take(2)?.uppercase() ?: "C"
     )
+
+    var previousRank by remember { mutableStateOf(profile.rank) }
+    var showRankUpDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(profile.rank) {
+        if (previousRank != "citizen" && profile.rank != previousRank) {
+            showRankUpDialog = true
+        }
+        previousRank = profile.rank
+    }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showLogoutDialog  by remember { mutableStateOf(false) }
@@ -191,7 +223,8 @@ fun ProfileScreen(
                     profile.name.take(2).uppercase()
                 },
                 name         = profile.name,
-                role         = profile.role,
+                rank         = profile.rank,
+                civicPoints  = profile.civicPoints,
                 profilePic   = user?.profilePic,
                 isLoading    = authState.isLoading,
                 onEditClick  = { galleryLauncher.launch("image/*") },
@@ -208,6 +241,7 @@ fun ProfileScreen(
                     reports  = profile.reportsCount,
                     resolved = profile.resolvedCount,
                     upvotes  = profile.upvotesCount,
+                    points   = profile.civicPoints,
                 )
             }
 
@@ -335,6 +369,12 @@ fun ProfileScreen(
         )
     }
 
+    if (showRankUpDialog) {
+        RankUpDialog(
+            newRank = profile.rank,
+            onDismiss = { showRankUpDialog = false }
+        )
+    }
 }
 
 // ── Avatar section ────────────────────────────────────────────────────────────
@@ -342,7 +382,8 @@ fun ProfileScreen(
 private fun AvatarSection(
     initials:    String,
     name:        String,
-    role:        String,
+    rank:        String,
+    civicPoints: Int,
     profilePic:  String? = null,
     isLoading:   Boolean = false,
     onEditClick: () -> Unit,
@@ -427,26 +468,17 @@ private fun AvatarSection(
         Spacer(Modifier.height(6.dp))
 
         // Role badge
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(TealAccent.copy(alpha = 0.15f))
-                .border(1.dp, TealAccent.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-        ) {
-            Text(
-                text       = "🏅 $role",
-                fontSize   = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color      = Color(0xFF0D6E5A),
-            )
-        }
+        RankBadge(rank = rank)
+        
+        Spacer(Modifier.height(10.dp))
+        
+        PointsProgressBar(civicPoints = civicPoints)
     }
 }
 
 // ── Stats row ─────────────────────────────────────────────────────────────────
 @Composable
-private fun StatsRow(reports: Int, resolved: Int, upvotes: Int) {
+private fun StatsRow(reports: Int, resolved: Int, upvotes: Int, points: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -460,7 +492,9 @@ private fun StatsRow(reports: Int, resolved: Int, upvotes: Int) {
         StatDivider()
         StatItem(value = resolved, label = stringResource(R.string.resolved), icon = "✅")
         StatDivider()
-        StatItem(value = upvotes,  label = stringResource(R.string.upvotes),  icon = "⭐")
+        StatItem(value = upvotes,  label = stringResource(R.string.upvotes),  icon = "👍")
+        StatDivider()
+        StatItem(value = points,   label = "Points",   icon = "⭐")
     }
 }
 
@@ -697,6 +731,130 @@ private fun CivicAlertDialog(
                 border   = BorderStroke(1.dp, DividerColor),
             ) {
                 Text(stringResource(R.string.cancel), color = TextSecondary)
+            }
+        },
+        containerColor = CardWhite,
+        shape          = RoundedCornerShape(20.dp),
+    )
+}
+
+@Composable
+fun RankBadge(rank: String) {
+    val (label, color) = rank.toRankDisplay()
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(color.copy(alpha = 0.12f))
+            .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+    ) {
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = color)
+    }
+}
+
+@Composable
+fun PointsProgressBar(civicPoints: Int) {
+    val (current, target) = pointsToNextRank(civicPoints)
+    val progress          = (current / target.toFloat()).coerceIn(0f, 1f)
+    val isMaxRank         = current >= 700
+
+    val animProgress by animateFloatAsState(
+        targetValue   = progress,
+        animationSpec = tween(1000, easing = EaseOutCubic),
+        label         = "points",
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        // Points label
+        Text(
+            "$civicPoints pts",
+            fontSize   = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color      = NavyPrimary,
+        )
+
+        // Progress bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(NavyPrimary.copy(alpha = 0.08f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(animProgress)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(NavyPrimary, TealAccent)
+                        )
+                    )
+            )
+        }
+
+        // Next rank label
+        if (!isMaxRank) {
+            Text(
+                "${target - current} pts to next rank",
+                fontSize = 11.sp,
+                color    = TextSecondary,
+            )
+        } else {
+            Text(
+                "🎖️ Maximum rank achieved!",
+                fontSize   = 11.sp,
+                color      = Color(0xFFFFD700),
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+@Composable
+fun RankUpDialog(newRank: String, onDismiss: () -> Unit) {
+    val (label, color) = newRank.toRankDisplay()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Text("🎉", fontSize = 40.sp) },
+        title = {
+            Text(
+                "Rank Up!",
+                fontWeight = FontWeight.Bold,
+                color      = TextPrimary,
+                textAlign  = TextAlign.Center,
+            )
+        },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("You are now a", fontSize = 13.sp, color = TextSecondary)
+                Spacer(Modifier.height(8.dp))
+                Text(label, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Keep reporting and verifying\nto reach the next rank!",
+                    fontSize  = 12.sp,
+                    color     = TextSecondary,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick  = onDismiss,
+                colors   = ButtonDefaults.buttonColors(containerColor = NavyPrimary),
+                shape    = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Awesome! \uD83C\uDF8A")
             }
         },
         containerColor = CardWhite,

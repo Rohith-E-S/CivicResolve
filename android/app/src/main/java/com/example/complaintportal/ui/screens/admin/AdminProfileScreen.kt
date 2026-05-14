@@ -87,6 +87,7 @@ fun AdminProfileScreen(
     onBroadcastMessage:   () -> Unit,
     onChangePassword:     () -> Unit,
     onActivityLog:        () -> Unit,
+    onNavigateToAnalytics: () -> Unit,
 ) {
     val authState by authViewModel.authState.collectAsState()
     val complaintState by complaintViewModel.state.collectAsState()
@@ -260,6 +261,12 @@ fun AdminProfileScreen(
                     label   = stringResource(R.string.export_reports),
                     enabled = profile.canExportReports,
                     onClick = onExportReports,
+                )
+                SectionDivider()
+                ActionRow(
+                    icon    = Icons.Outlined.BarChart,
+                    label   = "Analytics Dashboard",
+                    onClick = onNavigateToAnalytics,
                 )
             }
 

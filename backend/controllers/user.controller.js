@@ -141,25 +141,32 @@ export const createAccount = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log(`[Login] Attempt for email: ${email}`);
 
     const userData = await User.findOne({ email });
 
-    if (!userData)
+    if (!userData) {
+      console.log(`[Login] User not found: ${email}`);
       return res.status(404).json({ success: false, message: "No User Found" });
+    }
 
     const isPasswordValid = await userData.checkPassword(password);
 
-    if (!isPasswordValid)
+    if (!isPasswordValid) {
+      console.log(`[Login] Invalid password for: ${email}`);
       return res
         .status(404)
         .json({ success: false, message: "Invalid credentials" });
+    }
 
     const token = await userData.getJWT();
+    console.log(`[Login] Token generated for: ${email}`);
 
     res.cookie("token", token, {
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
 
+    console.log(`[Login] Success for: ${email}`);
     res.status(201).json({
       success: true,
       user: userData,
@@ -167,6 +174,7 @@ export const login = async (req, res) => {
       message: "Logged in successfully",
     });
   } catch (error) {
+    console.error("[Login] CRITICAL ERROR:", error);
     res.status(500).json({
       success: false,
       message: `Error in login API: ${error.message}`,

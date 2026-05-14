@@ -2,7 +2,7 @@ package com.example.complaintportal.data.model
 
 data class AnalyticsResponse(
     val success: Boolean,
-    val data: AnalyticsDataDto
+    val data: AnalyticsDataDto?
 )
 
 data class AnalyticsDataDto(
@@ -25,7 +25,7 @@ data class CategoryStatDto(
 
 data class AdminAnalyticsResponse(
     val success: Boolean,
-    val data: AdminAnalyticsDataDto
+    val data: AdminAnalyticsDataDto?
 )
 
 data class AdminAnalyticsDataDto(

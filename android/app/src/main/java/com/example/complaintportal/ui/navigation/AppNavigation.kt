@@ -63,7 +63,9 @@ sealed class Screen(val route: String) {
     object Notifications      : Screen("notifications")
     object Analytics          : Screen("analytics")
     object AdminAnalytics     : Screen("admin_analytics")
-    object MapView            : Screen("map_view")
+    object MapView            : Screen("map_view?status={status}") {
+        fun createRoute(status: String) = "map_view?status=$status"
+    }
 
     object ComplaintDetail    : Screen("complaint_detail/{complaintId}") {
         fun createRoute(complaintId: String) = "complaint_detail/$complaintId"
@@ -260,9 +262,13 @@ fun AppNavigation(
                                 onNavigateToAnalytics = {
                                     navController.navigate(Screen.AdminAnalytics.route)
                                 },
-                                onNavigateToMap = {
-                                    navController.navigate(Screen.MapView.route)
-                                }
+                                onNavigateToMap = { status ->
+                                    navController.navigate(Screen.MapView.createRoute(status))
+                                },
+                                onNavigateToNotifications = {
+                                    navController.navigate(Screen.Notifications.route)
+                                },
+                                notificationViewModel = notificationViewModel
                                 )
                                 } else {
                                 UserDashboardScreen(
@@ -303,7 +309,8 @@ fun AppNavigation(
                         onExportReports = { /* TODO */ },
                         onBroadcastMessage = { /* TODO */ },
                         onChangePassword = { /* TODO */ },
-                        onActivityLog = { /* TODO */ }
+                        onActivityLog = { /* TODO */ },
+                        onNavigateToAnalytics = { navController.navigate(Screen.AdminAnalytics.route) }
                     )
                 } else {
                     ProfileScreen(
@@ -487,7 +494,7 @@ fun AppNavigation(
                             newCount = state.newComplaints.size,
                             communityRankPct = 0,
                             location = authState.detectedDistrict ?: "Your Area",
-                            period = "Error Loading Metrics",
+                            period = error ?: "Error Loading Metrics",
                             weeklyTrend = listOf(0, 0, 0, 0, 0, 0, 0),
                             weekLabels = listOf("M", "T", "W", "T", "F", "S", "S"),
                             categoryBreakdown = categories
@@ -545,15 +552,24 @@ fun AppNavigation(
                 }
             }
 
-            composable(Screen.MapView.route) {
+            composable(
+                route = Screen.MapView.route,
+                arguments = listOf(navArgument("status") { 
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = "All"
+                })
+            ) { backStackEntry ->
+                val status = backStackEntry.arguments?.getString("status") ?: "All"
                 if (authState.isAuthenticated) {
                     MapViewScreen(
                         viewModel = complaintViewModel,
                         isAdmin = authState.user?.isAdmin == true,
                         userId = authState.user?.id ?: "",
+                        statusFilter = status,
                         onNavigateBack = { navController.popBackStack() },
-                        onNavigateToDetail = { complaintId ->
-                            navController.navigate(Screen.ComplaintDetail.createRoute(complaintId))
+                        onNavigateToDetail = { complaintId -> 
+                            navController.navigate(Screen.ComplaintDetail.createRoute(complaintId)) 
                         }
                     )
                 } else {

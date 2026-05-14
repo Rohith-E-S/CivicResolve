@@ -22,11 +22,13 @@ import com.example.complaintportal.data.model.Complaint
 import com.example.complaintportal.data.model.isRealDispute
 import com.example.complaintportal.R
 import androidx.compose.ui.res.stringResource
+import com.example.complaintportal.ui.theme.bounceClick
 
 @Composable
 fun VerificationCard(
     complaint: Complaint,
     isWithinRange: Boolean,
+    hasAlreadyVerified: Boolean,
     onVerifyClick: () -> Unit,
     onDisputeClick: () -> Unit,
     isLoading: Boolean = false,
@@ -136,37 +138,95 @@ fun VerificationCard(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
+            val context = androidx.compose.ui.platform.LocalContext.current
+            
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                var showConfirmDialog by remember { mutableStateOf(false) }
+
+                if (showConfirmDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showConfirmDialog = false },
+                        title = { 
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = Color(0xFF1D9E75))
+                                Text("Confirm Resolution", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        text = { 
+                            Text(
+                                "Are you sure this issue is fixed? Your verification directly impacts the community status of this report.",
+                                style = MaterialTheme.typography.bodyMedium
+                            ) 
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showConfirmDialog = false
+                                    onVerifyClick()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D9E75)),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Yes, It's Fixed", fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showConfirmDialog = false }) {
+                                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        },
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                }
+
                 Button(
-                    onClick = onVerifyClick,
+                    onClick = {
+                        if (hasAlreadyVerified) {
+                            android.widget.Toast.makeText(context, "You have already verified this report!", android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
+                            showConfirmDialog = true
+                        }
+                    },
                     enabled = isWithinRange && !isLoading,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).bounceClick { 
+                        if (hasAlreadyVerified) {
+                            android.widget.Toast.makeText(context, "You have already verified this report!", android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
+                            showConfirmDialog = true
+                        }
+                    },
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF1D9E75) // Success Green
+                        containerColor = if (hasAlreadyVerified) Color(0xFF157053) else Color(0xFF1D9E75) // Darker green if verified
                     )
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
                     } else {
-                        Icon(Icons.Rounded.DoneAll, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            if (hasAlreadyVerified) Icons.Rounded.CheckCircle else Icons.Rounded.DoneAll, 
+                            contentDescription = null, 
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Yes, Fixed", fontWeight = FontWeight.Bold)
+                        Text(if (hasAlreadyVerified) "Verified" else "Yes, Fixed", fontWeight = FontWeight.Bold)
                     }
                 }
 
                 OutlinedButton(
                     onClick = onDisputeClick,
-                    enabled = !isLoading,
-                    modifier = Modifier.weight(1f),
+                    enabled = !isLoading && !hasAlreadyVerified,
+                    modifier = Modifier.weight(1f).bounceClick { 
+                        if (!hasAlreadyVerified) onDisputeClick() 
+                    },
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
+                        contentColor = if (hasAlreadyVerified) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error
                     ),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                    border = BorderStroke(1.dp, if (hasAlreadyVerified) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error)
                 ) {
                     Icon(Icons.Rounded.ReportProblem, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
@@ -324,7 +384,7 @@ fun DisputeInfoCard(
                 ) {
                     Button(
                         onClick = { onResolveClick("reopen") },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).bounceClick { onResolveClick("reopen") },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -332,7 +392,7 @@ fun DisputeInfoCard(
                     }
                     Button(
                         onClick = { onResolveClick("confirm") },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).bounceClick { onResolveClick("confirm") },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D9E75)),
                         shape = RoundedCornerShape(12.dp)
                     ) {

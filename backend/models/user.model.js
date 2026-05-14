@@ -85,6 +85,25 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    fcmToken: {
+      type: String,
+      default: null,
+    },
+    civicPoints: {
+      type: Number,
+      default: 0,
+    },
+    rank: {
+      type: String,
+      enum: [
+        "citizen",
+        "neighborhood_watch",
+        "community_hero",
+        "district_guardian",
+        "civic_champion",
+      ],
+      default: "citizen",
+    },
   },
   { timestamps: true }
 );

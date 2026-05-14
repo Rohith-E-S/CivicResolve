@@ -101,8 +101,18 @@ fun MorphingStatusBadge(
             "new" -> Color(0xFFFFEBEE) to Color(0xFFD32F2F)
             "under_review" -> Color(0xFFFFF3E0) to Color(0xFFE65100)
             "in_progress" -> Color(0xFFE3F2FD) to Color(0xFF1565C0)
-            "resolved" -> Color(0xFFE8F5E9) to Color(0xFF2E7D32)
+            "re_opened" -> Color(0xFFFFEBEE) to Color(0xFFD32F2F)
+            "pending_verification" -> Color(0xFFFFF3E0) to Color(0xFFE65100)
+            "disputed" -> Color(0xFFFFEBEE) to Color(0xFFB71C1C)
+            "resolved", "confirmed_resolved" -> Color(0xFFE8F5E9) to Color(0xFF2E7D32)
             else -> Color.LightGray to Color.DarkGray
+        }
+
+        val displayText = when (currentStatus.lowercase()) {
+            "re_opened" -> "REOPENED"
+            "pending_verification" -> "PENDING VERIFICATION"
+            "confirmed_resolved" -> "CONFIRMED RESOLVED"
+            else -> currentStatus.replace("_", " ").uppercase()
         }
 
         androidx.compose.foundation.layout.Box(
@@ -111,7 +121,7 @@ fun MorphingStatusBadge(
                 .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
             androidx.compose.material3.Text(
-                text = currentStatus.uppercase(),
+                text = displayText,
                 color = textColor,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                 fontSize = 12.sp

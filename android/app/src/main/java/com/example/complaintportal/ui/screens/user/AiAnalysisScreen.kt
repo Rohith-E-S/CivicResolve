@@ -22,6 +22,8 @@ import com.example.complaintportal.data.model.IssueCategory
 import kotlinx.coroutines.delay
 import androidx.compose.ui.res.stringResource
 import com.example.complaintportal.R
+import com.example.complaintportal.ui.theme.bounceClick
+import com.example.complaintportal.ui.components.SuccessAnimation
 
 // Colors removed for MaterialTheme migration
 
@@ -490,7 +492,7 @@ fun AiResultCard(
             // Confirm button
             Button(
                 onClick  = onConfirm,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp).bounceClick { onConfirm() },
                 shape    = RoundedCornerShape(14.dp),
                 colors   = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             ) {
@@ -502,7 +504,7 @@ fun AiResultCard(
             // Change button
             OutlinedButton(
                 onClick  = onChange,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp).bounceClick { onChange() },
                 shape    = RoundedCornerShape(14.dp),
                 border   = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
             ) {
@@ -671,6 +673,8 @@ fun AiSuccessScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
+        SuccessAnimation()
+        
         // Success circle
         Box(
             contentAlignment = Alignment.Center,
@@ -720,7 +724,7 @@ fun AiSuccessScreen(
 
         Button(
             onClick  = onFinish,
-            modifier = Modifier.padding(horizontal = 32.dp).fillMaxWidth().height(52.dp),
+            modifier = Modifier.padding(horizontal = 32.dp).fillMaxWidth().height(52.dp).bounceClick { onFinish() },
             shape    = RoundedCornerShape(14.dp),
             colors   = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
         ) {

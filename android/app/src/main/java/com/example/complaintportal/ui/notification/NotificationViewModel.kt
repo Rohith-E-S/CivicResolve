@@ -1,5 +1,6 @@
 package com.example.complaintportal.ui.notification
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -32,15 +33,30 @@ class NotificationViewModel(
     val uiState: StateFlow<NotificationUiState> = _uiState.asStateFlow()
 
     init {
-        joinSocketRoom()
-        listenForRealTimeNotifications()
+        setupSocketListeners()
         fetchNotifications()
         startPollingFallback()
     }
 
-    // ── Socket.IO ─────────────────────────────────────────────────────────────
+    private fun setupSocketListeners() {
+        socket.on(Socket.EVENT_CONNECT) {
+            Log.d("NotificationVM", "Socket connected, joining room: $userId")
+            joinSocketRoom()
+        }
+
+        socket.on(Socket.EVENT_CONNECT_ERROR) { args ->
+            Log.e("NotificationVM", "Socket connection error: ${args.getOrNull(0)}")
+        }
+        
+        if (socket.connected()) {
+            joinSocketRoom()
+        }
+
+        listenForRealTimeNotifications()
+    }
 
     private fun joinSocketRoom() {
+        Log.d("NotificationVM", "Joining notification room: $userId")
         socket.emit("join_room", userId)
     }
 
@@ -48,7 +64,7 @@ class NotificationViewModel(
         socket.on("new_notification") { args ->
             val data = args.getOrNull(0) as? JSONObject ?: return@on
             val item = NotificationItem(
-                id          = data.optString("id"),
+                id          = data.optString("_id"),
                 userId      = userId,
                 type        = data.optString("type"),
                 title       = data.optString("title"),
@@ -167,6 +183,9 @@ class NotificationViewModel(
     override fun onCleared() {
         super.onCleared()
         socket.off("new_notification")
+        socket.off(Socket.EVENT_CONNECT)
+        socket.off(Socket.EVENT_CONNECT_ERROR)
+        socket.disconnect()
     }
 }
 

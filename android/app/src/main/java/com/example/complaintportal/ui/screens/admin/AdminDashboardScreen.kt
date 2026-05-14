@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -44,14 +45,16 @@ fun AdminDashboardScreen(
     userId: String,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToAnalytics: () -> Unit = {},
-    onNavigateToMap: () -> Unit
+    onNavigateToMap: (String) -> Unit,
+    onNavigateToNotifications: () -> Unit,
+    notificationViewModel: com.example.complaintportal.ui.notification.NotificationViewModel? = null
 ) {
     val state by viewModel.state.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var isRefreshing by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
 
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    val pagerState = rememberPagerState(pageCount = { 4 })
     val coroutineScope = rememberCoroutineScope()
 
     val onRefresh = {
@@ -97,10 +100,18 @@ fun AdminDashboardScreen(
                     }
                 },
                 actions = {
+                    val notifState by notificationViewModel?.uiState?.collectAsState() ?: mutableStateOf(null)
+                    val unreadCount = notifState?.unreadCount ?: 0
+                    
+                    com.example.complaintportal.ui.notification.NotificationBell(
+                        unreadCount = unreadCount,
+                        onClick = onNavigateToNotifications
+                    )
+                    
                     Box(
                         modifier = Modifier
-                            .padding(end = 16.dp)
-                            .size(40.dp)
+                            .padding(end = 16.dp, start = 8.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(androidx.compose.ui.graphics.Color(0xFF1A3A6E))
                             .border(2.dp, androidx.compose.ui.graphics.Color(0xFFF4A700), CircleShape) // Admin gold border
@@ -127,7 +138,6 @@ fun AdminDashboardScreen(
                     activeCount   = state.inProgressComplaints.size,
                     resolvedCount = state.resolvedComplaints.size,
                 )
-2
                 Spacer(modifier = Modifier.height(2.dp))
                 
                 Row(
@@ -263,7 +273,15 @@ fun AdminDashboardScreen(
                     }
 
                     IconButton(
-                        onClick = onNavigateToMap,
+                        onClick = {
+                            val status = when (pagerState.currentPage) {
+                                1 -> "New"
+                                2 -> "Active"
+                                3 -> "Resolved"
+                                else -> "All"
+                            }
+                            onNavigateToMap(status)
+                        },
                         modifier = Modifier
                             .size(46.dp)
                             .background(
@@ -289,11 +307,20 @@ fun AdminDashboardScreen(
             ) {
                 item {
                     StatCard(
+                        title = "All",
+                        count = (state.newComplaints + state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints + state.resolvedComplaints).size.toString(),
+                        color = MaterialTheme.colorScheme.primary,
+                        isSelected = pagerState.currentPage == 0,
+                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
+                    )
+                }
+                item {
+                    StatCard(
                         title = "New",
                         count = state.newComplaints.size.toString(),
                         color = androidx.compose.ui.graphics.Color(0xFFE53935),
-                        isSelected = pagerState.currentPage == 0,
-                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
+                        isSelected = pagerState.currentPage == 1,
+                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } }
                     )
                 }
                 item {
@@ -301,8 +328,8 @@ fun AdminDashboardScreen(
                         title = "Active",
                         count = (state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints).size.toString(),
                         color = androidx.compose.ui.graphics.Color(0xFFE67E22),
-                        isSelected = pagerState.currentPage == 1,
-                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } }
+                        isSelected = pagerState.currentPage == 2,
+                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } }
                     )
                 }
                 item {
@@ -310,17 +337,8 @@ fun AdminDashboardScreen(
                         title = "Resolved",
                         count = state.resolvedComplaints.size.toString(),
                         color = androidx.compose.ui.graphics.Color(0xFF1D9E75),
-                        isSelected = pagerState.currentPage == 2,
-                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } }
-                    )
-                }
-                item {
-                    StatCard(
-                        title = "Analytics",
-                        count = "Charts",
-                        color = MaterialTheme.colorScheme.outline,
-                        isSelected = false,
-                        onClick = { onNavigateToAnalytics() }
+                        isSelected = pagerState.currentPage == 3,
+                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(3) } }
                     )
                 }
             }
@@ -330,9 +348,10 @@ fun AdminDashboardScreen(
                 modifier = Modifier.weight(1f)
             ) { page ->
                     val list = when (page) {
-                            0 -> state.newComplaints
-                            1 -> state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints
-                            2 -> state.resolvedComplaints
+                            0 -> state.newComplaints + state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints + state.resolvedComplaints
+                            1 -> state.newComplaints
+                            2 -> state.inProgressComplaints + state.pendingVerificationComplaints + state.disputedComplaints
+                            3 -> state.resolvedComplaints
                             else -> emptyList()
                         }
 
@@ -357,6 +376,13 @@ fun AdminDashboardScreen(
                             }
                         }
 
+                        val listState = rememberLazyListState()
+                        
+                        // Scroll to top when data changes
+                        LaunchedEffect(state.sortOption, searchQuery, page) {
+                            listState.scrollToItem(0)
+                        }
+
                         @OptIn(ExperimentalMaterial3Api::class)
                         val pullToRefreshState = rememberPullToRefreshState()
                         PullToRefreshBox(
@@ -373,6 +399,7 @@ fun AdminDashboardScreen(
                             }
                         ) {
                             LazyColumn(
+                                state = listState,
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(bottom = 16.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp)

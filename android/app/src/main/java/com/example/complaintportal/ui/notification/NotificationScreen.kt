@@ -200,7 +200,7 @@ fun NotificationScreen(
                                 onClick = {
                                     viewModel.markOneRead(notification.id)
                                     notification.complaintId?.let { id ->
-                                        if (notification.type == "admin_comment") {
+                                        if (notification.type == "admin_comment" || notification.type == "new_message") {
                                             onChatClick(id)
                                         } else {
                                             onComplaintClick(id)
@@ -315,19 +315,31 @@ private fun EmptyNotifications(modifier: Modifier = Modifier) {
 
 // ── Extension helpers ─────────────────────────────────────────────────────────
 private fun NotificationItem.icon(): ImageVector = when (type) {
-    "status_changed"  -> Icons.Default.Autorenew
-    "upvoted"         -> Icons.Default.ThumbUp
-    "admin_comment"   -> Icons.Default.Comment
-    "new_in_district" -> Icons.Default.LocationOn
-    else              -> Icons.Default.Notifications
+    "status_changed"           -> Icons.Default.Autorenew
+    "upvoted"                  -> Icons.Default.ThumbUp
+    "admin_comment"            -> Icons.Default.Comment
+    "new_message"              -> Icons.Default.Email
+    "new_in_district"          -> Icons.Default.LocationOn
+    "disputed"                 -> Icons.Default.Warning
+    "admin_new_report"         -> Icons.Default.Assignment
+    "admin_verification_alert" -> Icons.Default.VerifiedUser
+    "points_earned"            -> Icons.Default.Star
+    "rank_up"                  -> Icons.Default.EmojiEvents
+    else                       -> Icons.Default.Notifications
 }
 
 private fun NotificationItem.iconBgColor(): Color = when (type) {
-    "status_changed"  -> Color(0xFF1A3A6E)
-    "upvoted"         -> Color(0xFF1D9E75)
-    "admin_comment"   -> Color(0xFFE67E22)
-    "new_in_district" -> Color(0xFF8E44AD)
-    else              -> Color(0xFF6A7F9A)
+    "status_changed"           -> Color(0xFF1A3A6E)
+    "upvoted"                  -> Color(0xFF1D9E75)
+    "admin_comment"            -> Color(0xFFE67E22)
+    "new_message"              -> Color(0xFF27AE60)
+    "new_in_district"          -> Color(0xFF8E44AD)
+    "disputed"                 -> Color(0xFFC0392B)
+    "admin_new_report"         -> Color(0xFF2980B9)
+    "admin_verification_alert" -> Color(0xFF27AE60)
+    "points_earned"            -> Color(0xFFF39C12) // Golden Yellow
+    "rank_up"                  -> Color(0xFF9B59B6) // Purple
+    else                       -> Color(0xFF6A7F9A)
 }
 
 private fun NotificationItem.timeAgo(context: Context): String = try {

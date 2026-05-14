@@ -52,9 +52,12 @@ fun ChatScreen(
 
     val receiverId = remember(complaintState.currentComplaint, isAdmin) {
         if (isAdmin) {
+            // Admin replying to user: send to the complaint owner
             complaintState.currentComplaint?.user?.id ?: ""
         } else {
-            "67bc6660fbbeaa0606000000" // Default Admin
+            // User messaging admin: backend will route to the district admin
+            // Pass "admin" as a sentinel — backend ignores this and uses district lookup
+            complaintState.currentComplaint?.user?.id ?: ""
         }
     }
 

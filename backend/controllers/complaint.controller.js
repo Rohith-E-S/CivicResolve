@@ -15,15 +15,18 @@ import {
   hasKeyword,
 } from "../config/constants.js";
 import { sendMail } from "../config/email.js";
-import { 
-  notifyStatusChanged, 
-  notifyNewInDistrict, 
+import {
+  notifyStatusChanged,
+  notifyNewInDistrict,
   notifyUpvoted,
   notifyNearbyForVerification,
   notifyOwnerVerified,
   notifyAdminDisputed,
-  notifyDisputeResolved
+  notifyDisputeResolved,
+  notifyVerificationDone,
+  notifyAdminNewReport
 } from "../services/notificationService.js";
+import { awardPoints } from "../services/pointsService.js";
 
 const ACTIVE_COMPLAINT_QUERY = { isDeleted: { $ne: true } };
 const toRadians = (degree) => (degree * Math.PI) / 180;
@@ -233,14 +236,43 @@ export const createComplaint = async (req, res) => {
           homeDistrict: { $regex: new RegExp(city, "i") },
           _id: { $ne: req.user._id }
         }).select("_id");
-        
+
         if (neighbors.length > 0) {
           const neighborIds = neighbors.map(n => n._id);
           await notifyNewInDistrict(io, {
             districtUserIds: neighborIds,
             complaintId: newComplaint._id,
-            category: detectedCategory,
+            category: newComplaint.category,
             district: city
+          });
+        }
+
+        // Notify admins who have this district set (Fuzzy matching)
+        const allAdmins = await User.find({
+          isAdmin: true,
+          _id: { $ne: req.user._id }
+        }).select("_id homeDistrict");
+
+        const districtAdmins = allAdmins.filter(admin => {
+          if (!admin.homeDistrict || admin.homeDistrict.trim() === "") return true;
+          const d = admin.homeDistrict.toLowerCase().trim();
+          const c = city.toLowerCase().trim();
+          if (d === "all" || d.includes(c) || c.includes(d)) return true;
+          // Core district word match (e.g. "Jalandhar" from "Jalandhar Division")
+          const core = d.split(/\s+/)[0];
+          if (core && c.includes(core)) return true;
+          return false;
+        });
+
+        // Fallback: if no district matched, notify all admins
+        const adminsToNotify = districtAdmins.length > 0 ? districtAdmins : allAdmins;
+
+        if (adminsToNotify.length > 0) {
+          await notifyAdminNewReport(io, {
+            adminIds: adminsToNotify.map(a => a._id),
+            complaintId: newComplaint._id,
+            category: newComplaint.category,
+            city: city
           });
         }
       }
@@ -515,6 +547,12 @@ export const updateComplaintStatus = async (req, res) => {
     }
     await complaint.save();
 
+    // Award points if resolved
+    if (finalStatus === "confirmed_resolved" || finalStatus === "resolved") {
+      const io = req.app.get("io");
+      await awardPoints(complaint.user, "report_resolved", io);
+    }
+
     // Return populated complaint so Android gets user object
     const populatedComplaint = await Complaint.findById(complaintId).populate("user");
 
@@ -573,12 +611,15 @@ export const updateComplaintStatus = async (req, res) => {
         }
 
         if (neighbors.length > 0) {
+          console.log(`[VerificationAlert] Notifying ${neighbors.length} neighbors within 1km for complaint ${complaintId}`);
           await notifyNearbyForVerification(io, {
             nearbyUserIds: neighbors.map(n => n._id),
             complaintId,
             category: complaint.category,
             city: complaint.city
           });
+        } else {
+          console.log(`[VerificationAlert] No neighbors found within 1km for complaint ${complaintId}`);
         }
       } catch (err) {
         console.error("Failed to notify neighbors for verification:", err.message);
@@ -671,14 +712,55 @@ export const updateAfterImageUrl = async (req, res) => {
       });
     }
 
-    // Push in-app notification to complaint owner (fire-and-forget)
     notifyStatusChanged(io, {
       complaintOwnerId: complaint.user,
       complaintId,
       oldStatus: "in_progress",
       newStatus: "resolved",
-      category:  complaint.category,
+      category: complaint.category,
     }).catch(err => console.error("Notification failed:", err.message));
+
+    // Notify nearby users if pending verification
+    try {
+      const complaintLng = complaint.location?.coordinates?.[0];
+      const complaintLat = complaint.location?.coordinates?.[1];
+
+      let neighbors = [];
+
+      if (complaintLng != null && complaintLat != null && complaintLng !== 0 && complaintLat !== 0) {
+        console.log(`[VerificationAlert] Searching for neighbors within 1km of [${complaintLng}, ${complaintLat}]`);
+        neighbors = await User.find({
+          _id: { $ne: complaint.user },
+          lastLocation: {
+            $nearSphere: {
+              $geometry: { type: "Point", coordinates: [complaintLng, complaintLat] },
+              $maxDistance: 1000,
+            },
+          },
+          lastLocationUpdatedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        }).select("_id");
+      }
+
+      if (neighbors.length === 0) {
+        console.log(`[VerificationAlert] Fallback to homeDistrict (${complaint.city})`);
+        neighbors = await User.find({
+          homeDistrict: { $regex: new RegExp(complaint.city, "i") },
+          _id: { $ne: complaint.user }
+        }).select("_id");
+      }
+
+      if (neighbors.length > 0) {
+        console.log(`[VerificationAlert] Notifying ${neighbors.length} neighbors for verification`);
+        await notifyNearbyForVerification(io, {
+          nearbyUserIds: neighbors.map(n => n._id),
+          complaintId,
+          category: complaint.category,
+          city: complaint.city
+        });
+      }
+    } catch (err) {
+      console.error("Failed to notify neighbors for verification in updateAfterImageUrl:", err.message);
+    }
 
     res.status(201).json({
       success: true,
@@ -776,8 +858,52 @@ export const updateComplaint = async (req, res) => {
       complaintId,
       oldStatus: previousStatus,
       newStatus: complaint.status,
-      category:  complaint.category,
+      category: complaint.category,
     }).catch(err => console.error("Notification failed:", err.message));
+
+    // Notify nearby users if resolved or pending_verification
+    if (complaint.status === "resolved" || complaint.status === "pending_verification") {
+      try {
+        const complaintLng = complaint.location?.coordinates?.[0];
+        const complaintLat = complaint.location?.coordinates?.[1];
+
+        let neighbors = [];
+
+        if (complaintLng != null && complaintLat != null && complaintLng !== 0 && complaintLat !== 0) {
+          console.log(`[VerificationAlert] Searching for neighbors within 1km of [${complaintLng}, ${complaintLat}]`);
+          neighbors = await User.find({
+            _id: { $ne: complaint.user._id },
+            lastLocation: {
+              $nearSphere: {
+                $geometry: { type: "Point", coordinates: [complaintLng, complaintLat] },
+                $maxDistance: 1000,
+              },
+            },
+            lastLocationUpdatedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          }).select("_id");
+        }
+
+        if (neighbors.length === 0) {
+          console.log(`[VerificationAlert] Fallback to homeDistrict (${complaint.city})`);
+          neighbors = await User.find({
+            homeDistrict: { $regex: new RegExp(complaint.city, "i") },
+            _id: { $ne: complaint.user._id }
+          }).select("_id");
+        }
+
+        if (neighbors.length > 0) {
+          console.log(`[VerificationAlert] Notifying ${neighbors.length} neighbors for verification`);
+          await notifyNearbyForVerification(io, {
+            nearbyUserIds: neighbors.map(n => n._id),
+            complaintId,
+            category: complaint.category,
+            city: complaint.city
+          });
+        }
+      } catch (err) {
+        console.error("Failed to notify neighbors for verification in updateComplaint:", err.message);
+      }
+    }
 
     // Send email after resolved
     if (complaint.status === "resolved") {
@@ -1420,6 +1546,8 @@ export const supportComplaint = async (req, res) => {
       console.error("Failed to notify upvote:", err.message);
     }
 
+    await awardPoints(complaint.user, "report_upvoted", req.app.get("io"));
+
     return res.status(200).json({
       success: true,
       message: "Complaint supported successfully",
@@ -1440,13 +1568,16 @@ export const getPublicFeed = async (req, res) => {
     const query = { ...ACTIVE_COMPLAINT_QUERY };
 
     if (district && district !== "all") {
-      const safeDistrict = district.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const districtRegex = new RegExp(safeDistrict, "i");
-      query.$or = [
-        { city: districtRegex },
-        { state: districtRegex },
-        { landmark: districtRegex }
-      ];
+      const words = district.split(/[\s,]+/).filter(w => w.length > 2);
+      if (words.length > 0) {
+        const pattern = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+        const districtRegex = new RegExp(pattern, "i");
+        query.$or = [
+          { city: districtRegex },
+          { state: districtRegex },
+          { landmark: districtRegex }
+        ];
+      }
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -1530,12 +1661,7 @@ export const verifyComplaint = async (req, res) => {
       return res.status(400).json({ success: false, message: "Complaint is not in verification stage" });
     }
 
-    // 1. Not own complaint
-    if (complaint.user.toString() === req.user._id.toString()) {
-      return res.status(400).json({ success: false, message: "You cannot verify your own report" });
-    }
-
-    // 2. Not already verified by this user
+    // 1. Not already verified by this user
     const alreadyVerified = complaint.verifications.some(v => v.userId.toString() === req.user._id.toString());
     if (alreadyVerified) {
       return res.status(400).json({ success: false, message: "You have already verified this report" });
@@ -1571,9 +1697,28 @@ export const verifyComplaint = async (req, res) => {
     }
 
     await complaint.save();
+    
+    // Award points to the verifier
+    await awardPoints(req.user._id, "verified_issue", req.app.get("io"));
 
-    // Notify owner
+    // Notify parties
     const io = req.app.get("io");
+    try {
+      const admins = await User.find({ isAdmin: true }).select("_id");
+      await notifyVerificationDone(io, {
+        verifierId: req.user._id,
+        verifierName: req.user.fullName,
+        reporterId: complaint.user,
+        adminIds: admins.map(a => a._id),
+        complaintId: complaint._id,
+        category: complaint.category,
+        city: complaint.city
+      });
+    } catch (err) {
+      console.error("Verification notifications failed:", err.message);
+    }
+
+    // Notify owner specifically if fully resolved
     if (complaint.status === "resolved") {
       await notifyOwnerVerified(io, {
         complaintOwnerId: complaint.user,
@@ -1581,13 +1726,13 @@ export const verifyComplaint = async (req, res) => {
         category: complaint.category,
         count: complaint.verificationCount
       });
-      
+
       if (io) {
         io.to(complaint._id.toString()).emit("statusUpdated", {
           complaintId: complaint._id,
           status: "RESOLVED"
         });
-        
+
         io.emit("globalToast", {
           message: `Success! An issue in ${complaint.city} has been fully verified resolved!`,
           type: "success",
@@ -1618,18 +1763,13 @@ export const disputeComplaint = async (req, res) => {
       return res.status(400).json({ success: false, message: "Only pending resolutions can be disputed" });
     }
 
-    // 1. Not own complaint
-    if (complaint.user.toString() === req.user._id.toString()) {
-      return res.status(400).json({ success: false, message: "You cannot dispute your own report" });
+    // 1. Has not already verified this report
+    const hasVerified = complaint.verifications.some(v => v.userId.toString() === req.user._id.toString());
+    if (hasVerified) {
+      return res.status(400).json({ success: false, message: "You have already verified this report as fixed. You cannot dispute it now." });
     }
 
-    // 2. Account age >= 7 days
-    const accountAgeDays = (new Date() - new Date(req.user.createdAt)) / (1000 * 60 * 60 * 24);
-    if (accountAgeDays < 7) {
-      return res.status(400).json({ success: false, message: "Account must be at least 7 days old to dispute resolutions" });
-    }
-
-    // 3. Distance within 1km
+    // 2. Distance within 1km
     const distance = haversineDistanceKm(
       parseFloat(latitude), parseFloat(longitude),
       complaint.location.coordinates[1], complaint.location.coordinates[0]
@@ -1642,26 +1782,29 @@ export const disputeComplaint = async (req, res) => {
       return res.status(400).json({ success: false, message: "Photo proof is required for disputes" });
     }
 
+    console.log(`[Dispute] Processing dispute for complaint ${id} by user ${req.user._id}`);
+
     // 4. Upload photo & AI Analysis
+    console.log("[Dispute] Uploading proof to Cloudinary...");
     const upload = await cloudinary.uploader.upload(req.file.path, {
       categorization: "google_tagging",
       auto_tagging: 0.6
     });
     fs.unlinkSync(req.file.path);
+    console.log("[Dispute] Proof uploaded successfully");
 
     // Basic AI check: if tags match original category keywords
     const tags = upload.info?.categorization?.google_tagging?.data?.map(t => t.tag.toLowerCase()) || [];
-    // We'll simulate a more advanced reasoning here for the demo
-    const issueStillPresent = tags.length > 0; 
-    
+    const issueStillPresent = tags.length > 0;
+
     complaint.dispute = {
       userId: req.user._id,
       photo: upload.secure_url,
-      description,
+      description: description || "No description provided",
       aiAnalysis: {
         issueStillPresent,
         confidence: issueStillPresent ? 85 : 10,
-        reasoning: issueStillPresent 
+        reasoning: issueStillPresent
           ? `AI detected visual markers related to ${complaint.category} in the dispute photo.`
           : "AI did not find clear evidence of the issue, but manual review is recommended."
       },
@@ -1671,12 +1814,15 @@ export const disputeComplaint = async (req, res) => {
     complaint.status = "disputed";
     if (!complaint.timestamps) complaint.timestamps = {};
     complaint.timestamps.disputed = new Date();
-    
+
+    console.log("[Dispute] Saving complaint...");
     await complaint.save();
+    console.log("[Dispute] Complaint saved successfully");
 
     // Notify admins
     const io = req.app.get("io");
     const admins = await User.find({ isAdmin: true }).select("_id");
+    console.log(`[Dispute] Notifying ${admins.length} admins...`);
     await notifyAdminDisputed(io, {
       adminIds: admins.map(a => a._id),
       complaintId: complaint._id,
@@ -1697,6 +1843,7 @@ export const disputeComplaint = async (req, res) => {
       complaint: await Complaint.findById(id).populate("user")
     });
   } catch (error) {
+    console.error("[Dispute] CRITICAL ERROR:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -1715,13 +1862,17 @@ export const resolveDispute = async (req, res) => {
     const disputerId = complaint.dispute?.userId;
 
     if (action === "reopen") {
-      complaint.status = "in_progress";
+      complaint.status = "re_opened";
       complaint.verificationCount = 0;
       complaint.verifications = [];
       if (!complaint.timestamps) complaint.timestamps = {};
       complaint.timestamps.reopened = new Date();
+      complaint.markModified("timestamps");
       // Clear after image since it was invalid
       complaint.afterImageUrl = null;
+      
+      const io = req.app.get("io");
+      await awardPoints(complaint.dispute.userId, "dispute_accepted", io);
     } else {
       complaint.status = "confirmed_resolved";
       if (!complaint.timestamps) complaint.timestamps = {};

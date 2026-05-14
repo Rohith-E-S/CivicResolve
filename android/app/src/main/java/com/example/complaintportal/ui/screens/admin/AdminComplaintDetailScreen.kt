@@ -52,6 +52,7 @@ fun AdminComplaintDetailScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    var showSuccessAnimation by remember { mutableStateOf(false) }
 
     val uCropLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
@@ -67,6 +68,7 @@ fun AdminComplaintDetailScreen(
                 val requestFile = uploadFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
                 val body = MultipartBody.Part.createFormData("imageUrl", uploadFile.name, requestFile)
                 viewModel.uploadAfterImage(complaintId, body) {
+                    showSuccessAnimation = true
                     viewModel.fetchComplaint(complaintId, userId)
                     viewModel.fetchAdminComplaints(userId)
                 }
@@ -187,24 +189,11 @@ fun AdminComplaintDetailScreen(
                     Column {
                         Box(modifier = Modifier.fillMaxWidth().height(240.dp)) {
                             if (!complaint.beforeImageUrl.isNullOrBlank()) {
-                                val sharedTransitionScope = com.example.complaintportal.ui.navigation.LocalSharedTransitionScope.current
-                                val animatedVisibilityScope = com.example.complaintportal.ui.navigation.LocalNavAnimatedVisibilityScope.current
-                                var imageModifier = Modifier.fillMaxSize().clickable { showZoomDialog = complaint.beforeImageUrl }
-                                
-                                if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                                    with(sharedTransitionScope) {
-                                        imageModifier = imageModifier.sharedElement(
-                                            rememberSharedContentState(key = "image-${complaint.id}"),
-                                            animatedVisibilityScope = animatedVisibilityScope
-                                        )
-                                    }
-                                }
-
                                 Image(
                                     painter = rememberAsyncImagePainter(complaint.beforeImageUrl),
                                     contentDescription = stringResource(R.string.complaint_image),
                                     contentScale = ContentScale.Crop,
-                                    modifier = imageModifier
+                                    modifier = Modifier.fillMaxSize().clickable { showZoomDialog = complaint.beforeImageUrl }
                                 )
                             } else {
                                 Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
@@ -269,6 +258,7 @@ fun AdminComplaintDetailScreen(
                         isAdmin = true,
                         onResolveClick = { action ->
                             viewModel.resolveDispute(complaintId, action) {
+                                showSuccessAnimation = true
                                 viewModel.fetchComplaint(complaintId, userId)
                                 viewModel.fetchAdminComplaints(userId)
                             }
@@ -316,6 +306,7 @@ fun AdminComplaintDetailScreen(
                                 Button(
                                     onClick = { 
                                         viewModel.updateComplaintStatus(complaintId, "in_progress") {
+                                            showSuccessAnimation = true
                                             viewModel.fetchComplaint(complaintId, userId)
                                             viewModel.fetchAdminComplaints(userId)
                                         }
@@ -400,29 +391,37 @@ fun AdminComplaintDetailScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Resolution Proof
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                        .padding(24.dp)
-                ) {
-                    Column {
-                        Text(stringResource(R.string.resolution_proof), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        if (!complaint.afterImageUrl.isNullOrBlank()) {
-                            Image(
-                                painter = rememberAsyncImagePainter(complaint.afterImageUrl),
-                                contentDescription = stringResource(R.string.after_image),
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable { showZoomDialog = complaint.afterImageUrl }
-                            )
-                        } else {
+                // Resolution Proof & Comparison
+                if (!complaint.afterImageUrl.isNullOrBlank()) {
+                    Text(
+                        stringResource(R.string.before_after_comparison),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    com.example.complaintportal.ui.components.BeforeAfterSlider(
+                        beforeImageUrl = complaint.beforeImageUrl ?: "",
+                        afterImageUrl = complaint.afterImageUrl ?: "",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.drag_slider_transformation),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .padding(24.dp)
+                    ) {
+                        Column {
+                            Text(stringResource(R.string.resolution_proof), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(16.dp))
                             OutlinedButton(
                                 onClick = { galleryLauncher.launch("image/*") },
                                 modifier = Modifier.fillMaxWidth(),
@@ -444,6 +443,12 @@ fun AdminComplaintDetailScreen(
                     showZoomDialog = null
                 }
             }
+        }
+
+        if (showSuccessAnimation) {
+            com.example.complaintportal.ui.components.SuccessAnimation(
+                onAnimationFinished = { showSuccessAnimation = false }
+            )
         }
     }
 }

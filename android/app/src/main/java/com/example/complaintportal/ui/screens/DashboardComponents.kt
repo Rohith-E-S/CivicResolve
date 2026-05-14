@@ -38,6 +38,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.complaintportal.R
+import com.example.complaintportal.ui.theme.bounceClick
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 
@@ -134,7 +135,7 @@ fun ComplaintCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(144.dp)
-            .clickable { onClick() },
+            .bounceClick { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -151,21 +152,11 @@ fun ComplaintCard(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 if (!complaint.beforeImageUrl.isNullOrBlank()) {
-                    var imageModifier = Modifier.fillMaxSize()
-                    if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                        with(sharedTransitionScope) {
-                            imageModifier = imageModifier.sharedElement(
-                                rememberSharedContentState(key = "image-${complaint.id}"),
-                                animatedVisibilityScope = animatedVisibilityScope
-                            )
-                        }
-                    }
-
                     Image(
                         painter = rememberAsyncImagePainter(complaint.beforeImageUrl),
                         contentDescription = stringResource(R.string.complaint_image),
                         contentScale = ContentScale.Crop,
-                        modifier = imageModifier
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     Icon(
@@ -228,19 +219,9 @@ fun ComplaintCard(
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            if (showCommunityFeatures) {
-                                if (currentUserId != null && complaint.user?.id == currentUserId && showYouReportedTag) {
-                                    YouReportedBadge()
-                                } else {
-                                    Text(
-                                        text = stringResource(R.string.citizen_in, complaint.city.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary.copy(alpha=0.7f),
-                                        modifier = Modifier.padding(bottom = 2.dp)
-                                    )
-                                }
+                        if (showCommunityFeatures && isOwner && showYouReportedTag) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                YouReportedBadge()
                             }
                         }
                         Text(
@@ -689,18 +670,20 @@ fun distanceColor(meters: Double): Color = when {
 fun SortFilterDropdown(
     selectedSort:  SortOption,
     activeTab:     Int,
+    showNearest:   Boolean = false,
     onSortChanged: (SortOption) -> Unit,
     modifier:      Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     // Available options based on active tab
-    val availableOptions = remember(activeTab) {
+    val availableOptions = remember(activeTab, showNearest) {
         buildList {
+            add(SortOption.DATE_DESC)
             add(SortOption.DATE_ASC)
             add(SortOption.RATING_DESC)
             add(SortOption.UPVOTES_DESC)
-            if (activeTab == 0) { // Only show Nearest for Community Hub
+            if (showNearest) { 
                 add(SortOption.NEAREST)
             }
         }
@@ -792,7 +775,6 @@ fun SortFilterDropdown(
     }
 }
 
-// ── Distance label composable — for complaint cards ───────────────────────────
 @Composable
 fun ComplaintDistanceLabel(
     distanceMeters: Double?,
@@ -804,23 +786,31 @@ fun ComplaintDistanceLabel(
     val color = distanceColor(distanceMeters)
     val label = distanceLabel(distanceMeters)
 
-    Row(
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-        modifier              = modifier,
+    Surface(
+        modifier = modifier.height(24.dp),
+        shape = RoundedCornerShape(6.dp),
+        color = color.copy(alpha = 0.08f),
+        border = BorderStroke(0.5.dp, color.copy(alpha = 0.3f))
     ) {
-        Icon(
-            Icons.Default.LocationOn,
-            contentDescription = null,
-            tint     = color,
-            modifier = Modifier.size(12.dp),
-        )
-        Text(
-            text       = label,
-            fontSize   = 11.sp,
-            color      = color,
-            fontWeight = FontWeight.Medium,
-        )
+        Row(
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = 8.dp)
+        ) {
+            Icon(
+                Icons.Rounded.Navigation,
+                contentDescription = null,
+                tint     = color,
+                modifier = Modifier.size(10.dp),
+            )
+            Text(
+                text       = label,
+                fontSize   = 10.sp,
+                color      = color,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.2.sp
+            )
+        }
     }
 }
 
