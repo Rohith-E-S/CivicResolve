@@ -299,7 +299,13 @@ const Explore = () => {
         <button onClick={() => navigate("/map")} className="ui-btn ui-btn-ghost">
           Map
         </button>
-        <button onClick={() => navigate("/dashboard")} className="ui-btn ui-btn-ghost">
+        <button
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent("dashboard:tab", { detail: "chats" }));
+            navigate("/dashboard");
+          }}
+          className="ui-btn ui-btn-ghost"
+        >
           Chats
         </button>
       </nav>

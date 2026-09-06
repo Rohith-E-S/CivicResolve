@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+const goToDashboardTab = (tab) => (nav) => {
+  window.dispatchEvent(new CustomEvent("dashboard:tab", { detail: tab }));
+  nav("/dashboard");
+};
+
 const COMMANDS = [
   { id: "overview", label: "Go to Overview", icon: "dashboard", action: (nav) => nav("/dashboard"), keys: "G O" },
-  { id: "new", label: "New complaint", icon: "add_location", action: (nav) => { nav("/dashboard"); localStorage.setItem("dashboardActiveTab", "new-complaint"); }, keys: "N" },
+  { id: "new", label: "New complaint", icon: "add_location", action: goToDashboardTab("new-complaint"), keys: "N" },
   { id: "explore", label: "Explore list", icon: "explore", action: (nav) => nav("/explore"), keys: "E" },
   { id: "map", label: "Map view", icon: "map", action: (nav) => nav("/map"), keys: "M" },
-  { id: "chats", label: "Chats", icon: "chat", action: (nav) => nav("/dashboard"), keys: "C" },
-  { id: "profile", label: "Profile", icon: "person", action: (nav) => nav("/dashboard"), keys: "P" },
+  { id: "chats", label: "Chats", icon: "chat", action: goToDashboardTab("chats"), keys: "C" },
+  { id: "profile", label: "Profile", icon: "person", action: goToDashboardTab("profile"), keys: "P" },
 ];
 
 const CommandPalette = () => {
