@@ -124,10 +124,14 @@ fun AllComplaintsPane(appContainer: AppContainer, onOpen: (String) -> Unit) {
     var search by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("all") }
     var page by remember { mutableStateOf(1) }
-    LaunchedEffect(filter, search, page) { vm.fetchComplaints(page, filter, search) }
-    // debounce search
     var debounced by remember { mutableStateOf(search) }
-    LaunchedEffect(search) { kotlinx.coroutines.delay(400); debounced = search; page = 1 }
+    // Debounce the search term so typing doesn't fire a request per keystroke
+    LaunchedEffect(search) {
+        kotlinx.coroutines.delay(400)
+        debounced = search
+        page = 1
+    }
+    LaunchedEffect(filter, debounced, page) { vm.fetchComplaints(page, filter, debounced) }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         UiCard {
