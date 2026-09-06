@@ -29,6 +29,7 @@ import {
 import { awardPoints } from "../services/pointsService.js";
 
 const ACTIVE_COMPLAINT_QUERY = { isDeleted: { $ne: true } };
+const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const toRadians = (degree) => (degree * Math.PI) / 180;
 
 const haversineDistanceKm = (lat1, lon1, lat2, lon2) => {
@@ -233,7 +234,7 @@ export const createComplaint = async (req, res) => {
       const io = req.app.get("io");
       if (io && city) {
         const neighbors = await User.find({
-          homeDistrict: { $regex: new RegExp(city, "i") },
+          homeDistrict: { $regex: new RegExp(escapeRegExp(city), "i") },
           _id: { $ne: req.user._id }
         }).select("_id");
 
@@ -605,7 +606,7 @@ export const updateComplaintStatus = async (req, res) => {
         // Fallback: homeDistrict match if no GPS users found
         if (neighbors.length === 0) {
           neighbors = await User.find({
-            homeDistrict: { $regex: new RegExp(complaint.city, "i") },
+            homeDistrict: { $regex: new RegExp(escapeRegExp(complaint.city), "i") },
             _id: { $ne: complaint.user }
           }).select("_id");
         }
@@ -745,7 +746,7 @@ export const updateAfterImageUrl = async (req, res) => {
       if (neighbors.length === 0) {
         console.log(`[VerificationAlert] Fallback to homeDistrict (${complaint.city})`);
         neighbors = await User.find({
-          homeDistrict: { $regex: new RegExp(complaint.city, "i") },
+          homeDistrict: { $regex: new RegExp(escapeRegExp(complaint.city), "i") },
           _id: { $ne: complaint.user }
         }).select("_id");
       }
@@ -890,7 +891,7 @@ export const updateComplaint = async (req, res) => {
         if (neighbors.length === 0) {
           console.log(`[VerificationAlert] Fallback to homeDistrict (${complaint.city})`);
           neighbors = await User.find({
-            homeDistrict: { $regex: new RegExp(complaint.city, "i") },
+            homeDistrict: { $regex: new RegExp(escapeRegExp(complaint.city), "i") },
             _id: { $ne: complaint.user._id }
           }).select("_id");
         }
