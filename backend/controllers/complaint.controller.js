@@ -1461,6 +1461,7 @@ export const getNearbyComplaints = async (req, res) => {
     }
 
     const complaints = await Complaint.find({
+      ...ACTIVE_COMPLAINT_QUERY,
       location: {
         $nearSphere: {
           $geometry: {
@@ -1470,7 +1471,7 @@ export const getNearbyComplaints = async (req, res) => {
           $maxDistance: radius, // in meters
         },
       },
-      status: { $ne: "resolved" }, // only show active issues
+      status: { $nin: ["resolved", "confirmed_resolved"] }, // only show active issues
     })
       .select("category description location status timestamps createdAt")
       .limit(10)
