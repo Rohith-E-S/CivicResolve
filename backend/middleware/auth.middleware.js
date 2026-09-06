@@ -7,8 +7,8 @@ export const protectRoute = async (req, res, next) => {
 
     if (!token) {
       return res
-        .status(404)
-        .json({ success: false, message: "token not found" });
+        .status(401)
+        .json({ success: false, message: "Not authenticated" });
     }
 
     const decodedMessage = jwt.verify(token, process.env.JWT_SECRET_KEY);
@@ -17,7 +17,7 @@ export const protectRoute = async (req, res, next) => {
 
     if (!user) {
       return res
-        .status(404)
+        .status(401)
         .json({ success: false, message: "User not found" });
     }
 
@@ -25,10 +25,12 @@ export const protectRoute = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error("protectRoute Error:", error);
-    return res.status(500).json({
+    // An expired or tampered token throws in jwt.verify — that is an
+    // authentication failure (401), not a server error
+    console.error("protectRoute Error:", error.message);
+    return res.status(401).json({
       success: false,
-      message: `Error in protectRoute Middleware ${error.message}`,
+      message: "Session invalid or expired. Please log in again.",
     });
   }
 };

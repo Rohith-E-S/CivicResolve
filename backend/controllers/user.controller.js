@@ -149,7 +149,9 @@ export const login = async (req, res) => {
 
     if (!userData) {
       console.log(`[Login] User not found: ${email}`);
-      return res.status(404).json({ success: false, message: "No User Found" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid credentials" });
     }
 
     const isPasswordValid = await userData.checkPassword(password);
@@ -157,7 +159,7 @@ export const login = async (req, res) => {
     if (!isPasswordValid) {
       console.log(`[Login] Invalid password for: ${email}`);
       return res
-        .status(404)
+        .status(401)
         .json({ success: false, message: "Invalid credentials" });
     }
 
