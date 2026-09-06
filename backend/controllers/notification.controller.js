@@ -1,9 +1,9 @@
 import Notification from "../models/notification.model.js";
 
-/** GET /api/notifications/:userId */
+/** GET /api/notifications */
 export const getNotifications = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user._id;
     const limit = parseInt(req.query.limit) || 20;
     const skip  = parseInt(req.query.skip)  || 0;
 
@@ -18,20 +18,20 @@ export const getNotifications = async (req, res) => {
   }
 };
 
-/** GET /api/notifications/:userId/unread-count */
+/** GET /api/notifications/unread-count */
 export const getUnreadCount = async (req, res) => {
   try {
-    const count = await Notification.countDocuments({ userId: req.params.userId, isRead: false });
+    const count = await Notification.countDocuments({ userId: req.user._id, isRead: false });
     res.json({ success: true, unreadCount: count });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-/** PATCH /api/notifications/:userId/read-all */
+/** PATCH /api/notifications/read-all */
 export const markAllRead = async (req, res) => {
   try {
-    await Notification.updateMany({ userId: req.params.userId, isRead: false }, { isRead: true });
+    await Notification.updateMany({ userId: req.user._id, isRead: false }, { isRead: true });
     res.json({ success: true, message: "All notifications marked as read." });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -41,17 +41,20 @@ export const markAllRead = async (req, res) => {
 /** PATCH /api/notifications/:id/read */
 export const markOneRead = async (req, res) => {
   try {
-    await Notification.findByIdAndUpdate(req.params.id, { isRead: true });
+    await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { isRead: true }
+    );
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-/** DELETE /api/notifications/:userId */
+/** DELETE /api/notifications */
 export const clearAll = async (req, res) => {
   try {
-    await Notification.deleteMany({ userId: req.params.userId });
+    await Notification.deleteMany({ userId: req.user._id });
     res.json({ success: true, message: "All notifications cleared." });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
