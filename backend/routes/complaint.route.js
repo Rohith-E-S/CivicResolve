@@ -28,7 +28,7 @@ import {
 } from "../controllers/complaint.controller.js";
 import { getAdminAnalytics, getUserAnalytics } from "../controllers/analytics.controller.js";
 
-import { protectRoute } from "../middleware/auth.middleware.js";
+import { protectRoute, adminOnly } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/uploads.js";
 
 const complaintRouter = express.Router();
@@ -72,7 +72,7 @@ complaintRouter.get("/nearby", protectRoute, getNearbyComplaints);
 complaintRouter.patch("/:id", protectRoute, updateMyComplaint);
 complaintRouter.delete("/:id", protectRoute, deleteMyComplaint);
 complaintRouter.post("/support/:id", protectRoute, supportComplaint);
-complaintRouter.get("/analytics/admin", protectRoute, getAdminAnalytics);
+complaintRouter.get("/analytics/admin", protectRoute, adminOnly, getAdminAnalytics);
 complaintRouter.get("/analytics/user", protectRoute, getUserAnalytics);
 
 // Community Verification & Disputes
