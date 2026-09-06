@@ -802,9 +802,10 @@ export const updateComplaint = async (req, res) => {
     }
 
     // Validate status (if provided)
+    const normalizedStatus = typeof status === "string" ? status.toLowerCase() : undefined;
     if (
       status &&
-      !["new", "in_progress", "resolved"].includes(status.toLowerCase())
+      !["new", "under_review", "in_progress", "resolved"].includes(normalizedStatus)
     ) {
       return res.status(400).json({
         success: false,
@@ -831,7 +832,7 @@ export const updateComplaint = async (req, res) => {
     }
 
     if (!req.file && status) {
-      complaint.status = status.toLowerCase();
+      complaint.status = normalizedStatus;
     }
 
     // Push in-app notification to complaint owner

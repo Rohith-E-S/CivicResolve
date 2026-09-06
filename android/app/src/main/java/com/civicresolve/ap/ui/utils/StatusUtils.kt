@@ -50,3 +50,6 @@ fun haversineDistance(lat1: Double, lng1: Double, lat2: Double, lng2: Double): D
 
 fun categoryDisplayName(category: String?): String =
     category?.replace("_", " ")?.uppercase() ?: "OTHER"
+
+fun statusLabel(status: String): String =
+    status.replace("_", " ").replaceFirstChar { it.uppercase() }

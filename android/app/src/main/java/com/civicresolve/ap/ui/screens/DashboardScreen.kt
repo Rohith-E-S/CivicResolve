@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.civicresolve.ap.data.model.Complaint
 import com.civicresolve.ap.di.AppContainer
 import com.civicresolve.ap.ui.components.*
+import com.civicresolve.ap.ui.utils.statusLabel
 import com.civicresolve.ap.ui.theme.MonoFontFamily
 import com.civicresolve.ap.ui.viewmodel.AuthViewModel
 import com.civicresolve.ap.ui.viewmodel.DashboardViewModel
@@ -215,8 +216,8 @@ fun MyComplaintsList(
             Box {
                 OutlinedButton(onClick = { expanded = true }) { Text(filter, fontSize = 11.sp) }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    listOf("all", "new", "in progress", "resolved").forEach { f ->
-                        DropdownMenuItem(text = { Text(f) }, onClick = { filter = f; page = 1; expanded = false })
+                    listOf("all", "new", "in_progress", "resolved").forEach { f ->
+                        DropdownMenuItem(text = { Text(if (f == "all") f else statusLabel(f)) }, onClick = { filter = f; page = 1; expanded = false })
                     }
                 }
             }
@@ -418,8 +419,8 @@ fun UserChatsPane(appContainer: AppContainer, onOpenChat: (String) -> Unit) {
             Box {
                 OutlinedButton(onClick = { expanded = true }) { Text(filter, fontSize = 11.sp) }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    listOf("all", "new", "in progress", "resolved").forEach { f ->
-                        DropdownMenuItem(text = { Text(f) }, onClick = { filter = f; page = 1; expanded = false })
+                    listOf("all", "new", "in_progress", "resolved").forEach { f ->
+                        DropdownMenuItem(text = { Text(if (f == "all") f else statusLabel(f)) }, onClick = { filter = f; page = 1; expanded = false })
                     }
                 }
             }

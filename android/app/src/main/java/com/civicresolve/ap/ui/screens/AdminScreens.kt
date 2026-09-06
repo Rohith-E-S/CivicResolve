@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.civicresolve.ap.di.AppContainer
 import com.civicresolve.ap.ui.components.*
+import com.civicresolve.ap.ui.utils.statusLabel
 import com.civicresolve.ap.ui.theme.DisplayFontFamily
 import com.civicresolve.ap.ui.theme.MonoFontFamily
 import com.civicresolve.ap.ui.viewmodel.AdminViewModel
@@ -139,7 +140,7 @@ fun AllComplaintsPane(appContainer: AppContainer, onOpen: (String) -> Unit) {
             Box {
                 OutlinedButton(onClick = { expanded = true }) { Text(filter, fontSize = 11.sp) }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    listOf("all", "new", "in progress", "resolved").forEach { f -> DropdownMenuItem(text = { Text(f) }, onClick = { filter = f; expanded = false }) }
+                    listOf("all", "new", "in_progress", "resolved").forEach { f -> DropdownMenuItem(text = { Text(if (f == "all") f else statusLabel(f)) }, onClick = { filter = f; page = 1; expanded = false }) }
                 }
             }
         }
@@ -192,7 +193,7 @@ fun AdminChatsPane(appContainer: AppContainer, onOpenChat: (String) -> Unit) {
             Box {
                 OutlinedButton(onClick = { expanded = true }) { Text(filter, fontSize = 11.sp) }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    listOf("all", "new", "in progress", "resolved").forEach { f -> DropdownMenuItem(text = { Text(f) }, onClick = { filter = f; page = 1; expanded = false }) }
+                    listOf("all", "new", "in_progress", "resolved").forEach { f -> DropdownMenuItem(text = { Text(if (f == "all") f else statusLabel(f)) }, onClick = { filter = f; page = 1; expanded = false }) }
                 }
             }
         }
@@ -267,8 +268,8 @@ fun AdminComplaintOverviewScreen(
                         Box {
                             OutlinedButton(onClick = { expanded = true }) { Text(selectedStatus ?: c.status, fontSize = 11.sp) }
                             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                                listOf("new", "in progress", "resolved").forEach { s ->
-                                    DropdownMenuItem(text = { Text(s) }, onClick = {
+                                listOf("new", "in_progress", "resolved").forEach { s ->
+                                    DropdownMenuItem(text = { Text(statusLabel(s)) }, onClick = {
                                         if (s == "resolved" && c.afterImageUrl.isNullOrBlank()) {
                                             // need after image
                                         }
