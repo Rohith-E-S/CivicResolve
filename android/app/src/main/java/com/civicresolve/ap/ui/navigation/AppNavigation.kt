@@ -54,6 +54,16 @@ fun AppNavigation(
         r.onSuccess { res -> publicStats = res.stats }
     }
 
+    // Keep the notification socket in sync with the session
+    LaunchedEffect(authState.isAuthenticated, authState.user?.id) {
+        val userId = authState.user?.id
+        if (authState.isAuthenticated && userId != null) {
+            appContainer.notificationSocket.connect(userId)
+        } else {
+            appContainer.notificationSocket.disconnect()
+        }
+    }
+
     // Redirect when auth changes
     LaunchedEffect(authState.isAuthenticated, authState.isChecking) {
         if (!authState.isChecking) {
