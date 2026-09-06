@@ -39,8 +39,14 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
 
     override val notificationSocket = NotificationSocketManager(context, cookieJar, socketUrl)
 
+    // BODY-level logging writes passwords and session tokens to logcat —
+    // restrict it to debug builds
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = if (com.civicresolve.ap.BuildConfig.DEBUG) {
+            HttpLoggingInterceptor.Level.BODY
+        } else {
+            HttpLoggingInterceptor.Level.NONE
+        }
     }
 
     private val noCacheInterceptor = okhttp3.Interceptor { chain ->
