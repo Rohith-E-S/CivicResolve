@@ -246,11 +246,50 @@ export const checkAuth = (req, res) => {
 
 // Google OAUTH
 
+// Verifies a Google ID token via Google's tokeninfo endpoint (validates
+// signature and expiry server-side). Returns the token claims or null.
+async function verifyGoogleIdToken(credential) {
+  try {
+    const response = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
+    );
+    if (!response.ok) return null;
+    const info = await response.json();
+    if (info.aud && process.env.GOOGLE_CLIENT_ID && info.aud !== process.env.GOOGLE_CLIENT_ID) {
+      return null;
+    }
+    if (info.email_verified !== "true" && info.email_verified !== true) return null;
+    return info;
+  } catch {
+    return null;
+  }
+}
+
 export const googleLogin = async (req, res) => {
   try {
-    const { email, fullName, profilePic, googleId } = req.body;
+    const { credential, email, fullName, profilePic, googleId } = req.body;
 
-    if (!email || !googleId) {
+    let verifiedEmail = null;
+    let verifiedGoogleId = null;
+    let verifiedFullName = null;
+    let verifiedProfilePic = null;
+
+    if (credential) {
+      // Preferred path: derive identity from a Google-verified ID token
+      const claims = await verifyGoogleIdToken(credential);
+      if (!claims) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid Google credential",
+        });
+      }
+      verifiedEmail = claims.email;
+      verifiedGoogleId = claims.sub;
+      verifiedFullName = claims.name;
+      verifiedProfilePic = claims.picture;
+    }
+
+    if (!verifiedEmail && (!email || !googleId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid Google login data",
@@ -258,18 +297,33 @@ export const googleLogin = async (req, res) => {
     }
 
     // Check if user exists
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ email: verifiedEmail || email });
 
-    // Create new user if doesn't exist
     if (!user) {
+      if (!verifiedEmail) {
+        // Cannot create an account from unverified client-supplied claims
+        return res.status(401).json({
+          success: false,
+          message: "Google account verification required",
+        });
+      }
       user = await User.create({
-        email,
-        fullName,
-        googleId,
-        profilePic,
+        email: verifiedEmail,
+        fullName: verifiedFullName || verifiedEmail,
+        googleId: verifiedGoogleId,
+        profilePic: verifiedProfilePic || "",
         isGoogleUser: true,
         isVerified: true, // Google verifies email already
       });
+    } else if (!verifiedEmail) {
+      // Legacy clients without a credential: only allow login when the
+      // supplied googleId matches the stored one for an existing Google user
+      if (!user.isGoogleUser || !user.googleId || user.googleId !== googleId) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid Google login data",
+        });
+      }
     }
 
     // Create a JWT token
