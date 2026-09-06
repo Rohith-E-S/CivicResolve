@@ -39,6 +39,11 @@ class ChatViewModel(private val repo: ComplaintRepository, private val appContai
         this.currentComplaintId = complaintId
         this.currentUserId = currentUserId
         val token = appContainer.cookieJar.getToken() ?: return
+        // Each connect() used to create another live socket (the caller's
+        // LaunchedEffect re-runs on state changes), so every incoming
+        // message was delivered once per socket. Tear down any previous
+        // socket first.
+        disconnect()
         val opts = IO.Options().apply { auth = mapOf("token" to token) }
         socket = IO.socket(appContainer.socketUrl, opts)
         socket?.on(Socket.EVENT_CONNECT) {
