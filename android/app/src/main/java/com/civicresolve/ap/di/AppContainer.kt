@@ -28,7 +28,7 @@ interface AppContainer {
 }
 
 class DefaultAppContainer(private val context: Context) : AppContainer {
-    override val socketUrl = "https://ankle-paper-magnify.ngrok-free.dev"
+    override val socketUrl = com.civicresolve.ap.BuildConfig.API_BASE_URL
     override val baseUrl = "$socketUrl/api/"
 
     override val moshi = Moshi.Builder()
