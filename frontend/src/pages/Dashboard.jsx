@@ -65,6 +65,8 @@ const Dashboard = () => {
     try {
       const res = await API.get("/complaint/my-stats");
       if (res.data.success) setStats(res.data.stats);
+    } catch {
+      setMessage({ type: "error", text: "Could not load your stats. Please refresh." });
     } finally {
       setLoading(false);
     }
