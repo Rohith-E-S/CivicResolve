@@ -441,8 +441,8 @@ export const filterComplaintOnStateCity = async (req, res) => {
       });
     }
 
-    const state = (req.body.state || "").toLowerCase();
-    const city = (req.body.city || "").toLowerCase();
+    const state = ((req.query.state ?? req.body?.state) || "").toLowerCase();
+    const city = ((req.query.city ?? req.body?.city) || "").toLowerCase();
 
     if (!state && !city) {
       return res.status(400).json({
