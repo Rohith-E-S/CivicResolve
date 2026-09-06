@@ -41,8 +41,11 @@ complaintRouter.get("/get-complaints", protectRoute, getMyComplaint);
 
 complaintRouter.get("/get-all-complaints", protectRoute, getAllComplaints);
 
-complaintRouter.get("/public-stats", protectRoute, getPublicStats);
-complaintRouter.get("/feed", protectRoute, getPublicFeed);
+// Public, anonymous-accessible read-only endpoints (landing page stats,
+// public feed). Controllers expose only aggregate counts and populate a
+// minimal user field set.
+complaintRouter.get("/public-stats", getPublicStats);
+complaintRouter.get("/feed", getPublicFeed);
 
 complaintRouter.post("/update-complaint-status/:id",protectRoute,updateComplaintStatus,);
 
