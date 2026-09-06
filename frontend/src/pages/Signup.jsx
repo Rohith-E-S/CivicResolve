@@ -49,7 +49,10 @@ const Signup = () => {
     try {
       const res = await API.post("/auth/send-otp", { email: formData.email });
       if (res.data.success) {
-        localStorage.setItem("pendingSignup", JSON.stringify(formData));
+        // sessionStorage only: survives a refresh during the OTP step but is
+        // wiped when the tab closes, so the plaintext password never lingers
+        // in persistent storage
+        sessionStorage.setItem("pendingSignup", JSON.stringify(formData));
         navigate("/otp-verify", { state: { email: formData.email } });
       }
     } catch (err) {
