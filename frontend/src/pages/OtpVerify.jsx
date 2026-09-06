@@ -9,7 +9,9 @@ const OtpVerify = () => {
   const inputRefs = useRef([]);
   const { state } = useLocation();
   const navigate = useNavigate();
-  const email = state?.email;
+  const email =
+    state?.email ??
+    JSON.parse(sessionStorage.getItem("pendingSignup") || "null")?.email;
 
   const handleChange = (index, e) => {
     const value = e.target.value;
@@ -41,7 +43,7 @@ const OtpVerify = () => {
     try {
       const res = await API.post("/auth/verify-otp", { email, otp });
       if (res.data.success) {
-        const pending = JSON.parse(localStorage.getItem("pendingSignup"));
+        const pending = JSON.parse(sessionStorage.getItem("pendingSignup"));
         if (!pending) {
           setError("Signup session expired. Please register again.");
           navigate("/signup");
@@ -51,7 +53,7 @@ const OtpVerify = () => {
         const account = await API.post("/auth/create-account", pending);
         localStorage.setItem("token", account.data.token);
         localStorage.setItem("userData", JSON.stringify(account.data.user));
-        localStorage.removeItem("pendingSignup");
+        sessionStorage.removeItem("pendingSignup");
         navigate("/dashboard");
       }
     } catch (err) {
