@@ -79,7 +79,52 @@ io.on("connection", (socket) => {
   // Handle sending messages
   socket.on("sendMessage", async (data) => {
     try {
-      const { complaintId, toUser, message } = data;
+      const { complaintId, message } = data;
+
+      const complaint = await Complaint.findById(complaintId);
+      if (!complaint) {
+        socket.emit("error", { message: "Complaint not found" });
+        return;
+      }
+
+      // Resolve the recipient server-side. Clients used to send toUser
+      // themselves, and citizens ended up addressing their own messages to
+      // themselves, which broke seen-state and recipient logic permanently.
+      let recipientId;
+      if (socket.user.isAdmin) {
+        // Admin -> User: address the complaint owner
+        recipientId = complaint.user;
+      } else {
+        // User -> Admin: pick a district admin for this complaint's city
+        const User = (await import("./models/user.model.js")).default;
+        const allAdmins = await User.find({ isAdmin: true }).select("_id homeDistrict");
+        const city = (complaint.city || "").toLowerCase();
+
+        const districtAdmins = allAdmins.filter(admin => {
+          if (!admin.homeDistrict || admin.homeDistrict.trim() === "") return true; // Global admin
+          const d = admin.homeDistrict.toLowerCase().trim();
+          const c = city.trim();
+
+          // Exact / substring matches (both directions)
+          if (d === "all" || d.includes(c) || c.includes(d)) return true;
+
+          // Extract core district word (e.g. "Jalandhar" from "Jalandhar Division")
+          const coreDistrict = d.split(/\s+/)[0];
+          if (coreDistrict && c.includes(coreDistrict)) return true;
+
+          return false;
+        });
+
+        // Fallback: if no district admin matched, address any admin
+        recipientId = (districtAdmins[0] || allAdmins[0])?._id;
+      }
+
+      // Last resort (no admins registered): keep the client-supplied value
+      const toUser = recipientId || data.toUser;
+      if (!toUser) {
+        socket.emit("error", { message: "No recipient available for this message" });
+        return;
+      }
 
       // Save message to database
       const newMessage = await Message.create({
@@ -98,52 +143,48 @@ io.on("connection", (socket) => {
       io.to(complaintId).emit("newMessage", populatedMessage);
 
       // Notify recipient
-      const complaint = await Complaint.findById(complaintId);
-      if (complaint) {
-        if (socket.user.isAdmin) {
-          // Admin -> User: notify the complaint owner
-          await notifyAdminComment(io, {
-            complaintOwnerId: complaint.user.toString(),
+      if (socket.user.isAdmin) {
+        // Admin -> User: notify the complaint owner
+        await notifyAdminComment(io, {
+          complaintOwnerId: complaint.user.toString(),
+          complaintId,
+          adminName: socket.user.fullName,
+          commentPreview: message,
+          category: complaint.category
+        });
+      } else {
+        const User = (await import("./models/user.model.js")).default;
+        const allAdmins = await User.find({ isAdmin: true }).select("_id homeDistrict fullName");
+        const city = (complaint.city || "").toLowerCase();
+
+        const districtAdmins = allAdmins.filter(admin => {
+          if (!admin.homeDistrict || admin.homeDistrict.trim() === "") return true; // Global admin
+          const d = admin.homeDistrict.toLowerCase().trim();
+          const c = city.trim();
+
+          // Exact / substring matches (both directions)
+          if (d === "all" || d.includes(c) || c.includes(d)) return true;
+
+          // Extract core district word (e.g. "Jalandhar" from "Jalandhar Division")
+          const coreDistrict = d.split(/\s+/)[0];
+          if (coreDistrict && c.includes(coreDistrict)) return true;
+
+          return false;
+        });
+
+        // Fallback: if no district admin matched, notify ALL admins so messages are never lost
+        const adminsToNotify = districtAdmins.length > 0 ? districtAdmins : allAdmins;
+
+        console.log(`[Chat] User message for complaint in ${complaint.city}. Notifying ${adminsToNotify.length} admins (matched: ${districtAdmins.length}).`);
+
+        for (const admin of adminsToNotify) {
+          await notifyAdminNewMessage(io, {
+            adminId: admin._id,
             complaintId,
-            adminName: socket.user.fullName,
-            commentPreview: message,
+            userName: socket.user.fullName,
+            messagePreview: message,
             category: complaint.category
           });
-        } else {
-          // User -> Admin: find the real district admins for this complaint's city
-          const User = (await import("./models/user.model.js")).default;
-          const allAdmins = await User.find({ isAdmin: true }).select("_id homeDistrict fullName");
-          const city = (complaint.city || "").toLowerCase();
-
-          const districtAdmins = allAdmins.filter(admin => {
-            if (!admin.homeDistrict || admin.homeDistrict.trim() === "") return true; // Global admin
-            const d = admin.homeDistrict.toLowerCase().trim();
-            const c = city.trim();
-
-            // Exact / substring matches (both directions)
-            if (d === "all" || d.includes(c) || c.includes(d)) return true;
-
-            // Extract core district word (e.g. "Jalandhar" from "Jalandhar Division")
-            const coreDistrict = d.split(/\s+/)[0];
-            if (coreDistrict && c.includes(coreDistrict)) return true;
-
-            return false;
-          });
-
-          // Fallback: if no district admin matched, notify ALL admins so messages are never lost
-          const adminsToNotify = districtAdmins.length > 0 ? districtAdmins : allAdmins;
-
-          console.log(`[Chat] User message for complaint in ${complaint.city}. Notifying ${adminsToNotify.length} admins (matched: ${districtAdmins.length}).`);
-
-          for (const admin of adminsToNotify) {
-            await notifyAdminNewMessage(io, {
-              adminId: admin._id,
-              complaintId,
-              userName: socket.user.fullName,
-              messagePreview: message,
-              category: complaint.category
-            });
-          }
         }
       }
     } catch (error) {

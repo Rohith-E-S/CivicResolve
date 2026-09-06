@@ -97,10 +97,11 @@ class ChatViewModel(private val repo: ComplaintRepository, private val appContai
         socket?.connect()
     }
 
-    fun sendMessage(complaintId: String, toUserId: String, message: String) {
+    fun sendMessage(complaintId: String, message: String) {
+        // Recipient is resolved server-side (owner for admins, a district
+        // admin for citizens) — never send identity data from the client
         socket?.emit("sendMessage", JSONObject().apply {
             put("complaintId", complaintId)
-            put("toUser", toUserId)
             put("message", message)
         })
     }
