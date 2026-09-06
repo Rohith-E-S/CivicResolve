@@ -1549,6 +1549,13 @@ export const supportComplaint = async (req, res) => {
       });
     }
 
+    const firstEverSupport = !complaint.upvotersAwarded.some(
+      (id) => id.toString() === req.user._id.toString()
+    );
+    if (firstEverSupport) {
+      complaint.upvotersAwarded.push(req.user._id);
+    }
+
     complaint.supporters.push(req.user._id);
     complaint.supportCount = complaint.supporters.length;
     await complaint.save();
@@ -1569,7 +1576,11 @@ export const supportComplaint = async (req, res) => {
       console.error("Failed to notify upvote:", err.message);
     }
 
-    await awardPoints(complaint.user, "report_upvoted", req.app.get("io"));
+    // Only the first-ever support earns points; un-support/re-support
+    // toggles must not farm points for the owner
+    if (firstEverSupport) {
+      await awardPoints(complaint.user, "report_upvoted", req.app.get("io"));
+    }
 
     return res.status(200).json({
       success: true,

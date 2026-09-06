@@ -149,6 +149,14 @@ const complaintSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    // Users who have ever supported this complaint — points are awarded
+    // only once per user, so toggle re-supporting can't farm points
+    upvotersAwarded: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     isDeleted: {
       type: Boolean,
       default: false,
