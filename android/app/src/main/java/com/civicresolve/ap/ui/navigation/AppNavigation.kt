@@ -30,7 +30,10 @@ sealed class Screen(val route: String) {
     object OtpVerify : Screen("otp_verify/{email}") { fun createRoute(email: String) = "otp_verify/$email" }
     object ForgotPassword : Screen("forgot_password")
     object ResetPassword : Screen("reset_password/{token}") { fun createRoute(token: String) = "reset_password/$token" }
-    object Dashboard : Screen("dashboard")
+    object Dashboard : Screen("dashboard?tab={tab}") {
+        fun createRoute(tab: String? = null): String =
+            if (tab.isNullOrBlank()) "dashboard" else "dashboard?tab=$tab"
+    }
     object Explore : Screen("explore")
     object MapView : Screen("map_view")
     object ComplaintOverview : Screen("complaint_overview/{id}") { fun createRoute(id: String) = "complaint_overview/$id" }
@@ -200,7 +203,10 @@ fun AppNavigation(
                     )
                 }
             }
-            composable(Screen.Dashboard.route) {
+            composable(
+                Screen.Dashboard.route,
+                arguments = listOf(navArgument("tab") { nullable = true; defaultValue = null })
+            ) {
                 if (authState.isChecking) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 else if (!authState.isAuthenticated) {
                     LaunchedEffect(Unit) { navController.navigate(Screen.Login.route) { popUpTo(Screen.Dashboard.route) { inclusive = true } } }
@@ -210,6 +216,7 @@ fun AppNavigation(
                     DashboardScreen(
                         appContainer = appContainer,
                         authViewModel = authViewModel,
+                        initialTab = it.arguments?.getString("tab"),
                         onNavigateExplore = { navController.navigate(Screen.Explore.route) },
                         onNavigateMap = { navController.navigate(Screen.MapView.route) },
                         onOpenComplaint = { id -> navController.navigate(Screen.ComplaintOverview.createRoute(id)) },
@@ -223,6 +230,7 @@ fun AppNavigation(
                     appContainer = appContainer,
                     authViewModel = authViewModel,
                     onOpenComplaint = { id -> navController.navigate(Screen.ComplaintOverview.createRoute(id)) },
+                    onDashboardTab = { tab -> navController.navigate(Screen.Dashboard.createRoute(tab)) },
                     onDashboard = {
                         val dest = if (authState.user?.isAdmin == true) Screen.AdminDashboard.route else Screen.Dashboard.route
                         navController.navigate(dest) { popUpTo(Screen.Explore.route) { inclusive = true } }
