@@ -1694,9 +1694,15 @@ export const verifyComplaint = async (req, res) => {
       return res.status(400).json({ success: false, message: "Account must be at least 7 days old to verify resolutions" });
     }
 
-    // 4. Distance within 500m
+    // 4. Distance within 500m (reject missing/non-numeric coordinates first,
+    // otherwise NaN slips past the comparison and fails validation on save)
+    const verifyLat = parseFloat(latitude);
+    const verifyLng = parseFloat(longitude);
+    if (isNaN(verifyLat) || isNaN(verifyLng)) {
+      return res.status(400).json({ success: false, message: "Valid latitude and longitude are required" });
+    }
     const distance = haversineDistanceKm(
-      parseFloat(latitude), parseFloat(longitude),
+      verifyLat, verifyLng,
       complaint.location.coordinates[1], complaint.location.coordinates[0]
     );
     if (distance > 0.5) {
@@ -1706,7 +1712,7 @@ export const verifyComplaint = async (req, res) => {
     // Atomic update
     complaint.verifications.push({
       userId: req.user._id,
-      location: { type: "Point", coordinates: [parseFloat(longitude), parseFloat(latitude)] }
+      location: { type: "Point", coordinates: [verifyLng, verifyLat] }
     });
     complaint.verificationCount = complaint.verifications.length;
 
@@ -1790,9 +1796,15 @@ export const disputeComplaint = async (req, res) => {
       return res.status(400).json({ success: false, message: "You have already verified this report as fixed. You cannot dispute it now." });
     }
 
-    // 2. Distance within 1km
+    // 2. Distance within 1km (reject missing/non-numeric coordinates first,
+    // otherwise NaN slips past the comparison and fails validation on save)
+    const disputeLat = parseFloat(latitude);
+    const disputeLng = parseFloat(longitude);
+    if (isNaN(disputeLat) || isNaN(disputeLng)) {
+      return res.status(400).json({ success: false, message: "Valid latitude and longitude are required" });
+    }
     const distance = haversineDistanceKm(
-      parseFloat(latitude), parseFloat(longitude),
+      disputeLat, disputeLng,
       complaint.location.coordinates[1], complaint.location.coordinates[0]
     );
     if (distance > 0.5) {
@@ -1829,7 +1841,7 @@ export const disputeComplaint = async (req, res) => {
           ? `AI detected visual markers related to ${complaint.category} in the dispute photo.`
           : "AI did not find clear evidence of the issue, but manual review is recommended."
       },
-      location: { type: "Point", coordinates: [parseFloat(longitude), parseFloat(latitude)] }
+      location: { type: "Point", coordinates: [disputeLng, disputeLat] }
     };
 
     complaint.status = "disputed";
