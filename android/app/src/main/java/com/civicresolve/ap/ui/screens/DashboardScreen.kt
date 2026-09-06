@@ -45,6 +45,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 fun DashboardScreen(
     appContainer: AppContainer,
     authViewModel: AuthViewModel,
+    initialTab: String? = null,
     onNavigateExplore: () -> Unit,
     onNavigateMap: () -> Unit,
     onOpenComplaint: (String) -> Unit,
@@ -55,7 +56,7 @@ fun DashboardScreen(
     val authState by authViewModel.authState.collectAsState()
     val dashboardViewModel: DashboardViewModel = viewModel(factory = DashboardViewModelFactory(appContainer.complaintRepository))
     val dashState by dashboardViewModel.state.collectAsState()
-    var activeTab by remember { mutableStateOf("overview") }
+    var activeTab by remember { mutableStateOf(initialTab ?: "overview") }
     var collapsed by remember { mutableStateOf(false) }
     var showOnboarding by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()

@@ -30,6 +30,7 @@ fun ExploreScreen(
     onOpenComplaint: (String) -> Unit,
     onDashboard: () -> Unit,
     onMap: () -> Unit,
+    onDashboardTab: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val authState by authViewModel.authState.collectAsState()
@@ -241,7 +242,11 @@ fun ExploreScreen(
                 }
             }
         }
-        CitizenBottomNav(activeTab = "explore", onTabSelected = { if (it == "overview") onDashboard() else {} }, onExplore = {})
+        CitizenBottomNav(
+            activeTab = "explore",
+            onTabSelected = { tab -> if (tab == "overview") onDashboard() else onDashboardTab(tab) },
+            onExplore = {}
+        )
     }
 }
 
