@@ -42,10 +42,11 @@ export const getUserAnalytics = async (req, res) => {
     const activeCount = complaints.filter(c => c.status.toLowerCase() === "in_progress").length;
     const newCount = complaints.filter(c => c.status.toLowerCase() === "new").length;
 
-    // 2. Weekly Trend (Last 7 days)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
+    // 2. Weekly Trend (Last 7 days) — bucket in UTC so the aggregation
+    // ($dateToString defaults to UTC) and the fill loop agree on day
+    // boundaries regardless of the server's local timezone
+    const nowUtc = new Date();
+    const sevenDaysAgo = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate() - 6));
 
     const weeklyTrendData = await Complaint.aggregate([
       {
@@ -71,11 +72,11 @@ export const getUserAnalytics = async (req, res) => {
 
     for (let i = 0; i < 7; i++) {
       const d = new Date(sevenDaysAgo);
-      d.setDate(d.getDate() + i);
+      d.setUTCDate(d.getUTCDate() + i);
       const dateStr = d.toISOString().split("T")[0];
       const match = weeklyTrendData.find(item => item._id === dateStr);
       weeklyTrend.push(match ? match.count : 0);
-      weekLabels.push(days[d.getDay()]);
+      weekLabels.push(days[d.getUTCDay()]);
     }
 
     // 3. Category Breakdown
@@ -200,10 +201,9 @@ export const getAdminAnalytics = async (req, res) => {
     const avgResolutionDays = resolvedComplaints.length > 0 ? (totalDays / resolvedComplaints.length) : 0;
     const resolutionRatePct = totalComplaints > 0 ? Math.round((resolvedCount / totalComplaints) * 100) : 0;
 
-    // 3. Weekly Trends (Always 7 days for the chart labels, but we can respect period if needed)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
+    // 3. Weekly Trends — bucket in UTC to match $dateToString (see above)
+    const nowUtc = new Date();
+    const sevenDaysAgo = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate() - 6));
 
     const weeklyIncomingData = await Complaint.aggregate([
       { $match: { ...ACTIVE_QUERY, createdAt: { $gte: sevenDaysAgo } } },
@@ -250,15 +250,15 @@ export const getAdminAnalytics = async (req, res) => {
 
     for (let i = 0; i < 7; i++) {
       const d = new Date(sevenDaysAgo);
-      d.setDate(d.getDate() + i);
+      d.setUTCDate(d.getUTCDate() + i);
       const dateStr = d.toISOString().split("T")[0];
-      
+
       const inMatch = weeklyIncomingData.find(item => item._id === dateStr);
       const resMatch = weeklyResolvedData.find(item => item._id === dateStr);
-      
+
       weeklyIncoming.push(inMatch ? inMatch.count : 0);
       weeklyResolved.push(resMatch ? resMatch.count : 0);
-      weekLabels.push(days[d.getDay()]);
+      weekLabels.push(days[d.getUTCDay()]);
     }
 
     // 4. Category Breakdown
