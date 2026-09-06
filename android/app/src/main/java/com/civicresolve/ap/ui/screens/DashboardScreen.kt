@@ -1,5 +1,7 @@
 package com.civicresolve.ap.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +23,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.civicresolve.ap.data.model.Complaint
 import com.civicresolve.ap.di.AppContainer
@@ -127,26 +130,50 @@ fun DashboardScreen(
         if (showOnboarding) {
             var locLoading by remember { mutableStateOf(false) }
             var msg by remember { mutableStateOf<String?>(null) }
+            var detectedCity by remember { mutableStateOf<String?>(null) }
             val context = LocalContext.current
+            fun hasLocationPermission(): Boolean =
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+            fun detectLocation() {
+                locLoading = true
+                val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                try {
+                    fused.lastLocation.addOnSuccessListener { loc ->
+                        if (loc != null) {
+                            scope.launch {
+                                val res = com.civicresolve.ap.ui.utils.reverseGeocodeNominatim(loc.latitude, loc.longitude)
+                                detectedCity = res?.city
+                                msg = if (res?.city != null) "Detected ${res.city} — confirm below" else "Detected location, select manually"
+                                locLoading = false
+                            }
+                        } else { msg = "Location unavailable"; locLoading = false }
+                    }.addOnFailureListener { msg = "Location denied"; locLoading = false }
+                } catch (_: SecurityException) { msg = "Permission denied"; locLoading = false }
+            }
+
+            val locPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestMultiplePermissions()
+            ) { grants ->
+                if (grants.values.any { it }) detectLocation()
+                else { msg = "Location permission denied"; locLoading = false }
+            }
+
             OnboardingDistrictDialog(
                 currentDistrict = authState.user?.homeDistrict,
                 isLoading = authState.isLoading,
                 message = msg ?: authState.error,
                 locLoading = locLoading,
+                detectedDistrict = detectedCity,
                 onDetectLocation = {
-                    locLoading = true
-                    val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
-                    try {
-                        fused.lastLocation.addOnSuccessListener { loc ->
-                            if (loc != null) {
-                                scope.launch {
-                                    val res = com.civicresolve.ap.ui.utils.reverseGeocodeNominatim(loc.latitude, loc.longitude)
-                                    msg = if (res?.city != null) "Detected ${res.city} — confirm below" else "Detected location, select manually"
-                                    locLoading = false
-                                }
-                            } else { msg = "Location unavailable"; locLoading = false }
-                        }.addOnFailureListener { msg = "Location denied"; locLoading = false }
-                    } catch (_: SecurityException) { msg = "Permission denied"; locLoading = false }
+                    if (hasLocationPermission()) detectLocation()
+                    else locPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+                    )
                 },
                 onSave = { district ->
                     authViewModel.completeOnboarding(district) { showOnboarding = false; dashboardViewModel.fetchStats() }
@@ -280,7 +307,7 @@ fun NewComplaintPane(
         }
     }
 
-    fun getLocation() {
+    fun fetchLocation() {
         try {
             val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
             message = "Fetching location..."
@@ -292,6 +319,27 @@ fun NewComplaintPane(
                 } else message = "Unable to fetch location"
             }.addOnFailureListener { message = "Unable to fetch location" }
         } catch (_: SecurityException) { message = "Permission denied" }
+    }
+
+    fun hasLocationPermission(): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    val locPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (grants.values.any { it }) fetchLocation()
+        else message = "Location permission denied"
+    }
+
+    fun getLocation() {
+        if (hasLocationPermission()) fetchLocation()
+        else locPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
     }
 
     suspend fun doSubmit() {
