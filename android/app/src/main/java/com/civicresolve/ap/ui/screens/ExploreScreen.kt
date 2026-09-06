@@ -1,5 +1,9 @@
 package com.civicresolve.ap.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -10,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.civicresolve.ap.di.AppContainer
 import com.civicresolve.ap.ui.components.*
 import com.civicresolve.ap.ui.theme.MonoFontFamily
@@ -43,7 +48,15 @@ fun ExploreScreen(
     val userDistrict = authState.user?.homeDistrict ?: ""
     val scopeLocal = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
+    fun hasLocationPermission(): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    var fetchLocationGranted by remember { mutableStateOf(false) }
+
+    LaunchedEffect(fetchLocationGranted) {
+        if (!fetchLocationGranted) return@LaunchedEffect
+        fetchLocationGranted = false
         try {
             val fused = LocationServices.getFusedLocationProviderClient(context)
             fused.lastLocation.addOnSuccessListener { loc ->
@@ -53,6 +66,22 @@ fun ExploreScreen(
                 }
             }
         } catch (_: SecurityException) {}
+    }
+
+    val locPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (grants.values.any { it }) fetchLocationGranted = true
+    }
+
+    LaunchedEffect(Unit) {
+        if (hasLocationPermission()) fetchLocationGranted = true
+        else locPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
     }
 
     fun fetchFeed(p: Int = 1) {

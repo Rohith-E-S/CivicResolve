@@ -22,10 +22,17 @@ fun OnboardingDistrictDialog(
     message: String?,
     onDetectLocation: () -> Unit,
     onSave: (String) -> Unit,
-    locLoading: Boolean
+    locLoading: Boolean,
+    detectedDistrict: String? = null
 ) {
     var district by remember { mutableStateOf(currentDistrict ?: "") }
     var expanded by remember { mutableStateOf(false) }
+
+    // Preselect the reverse-geocoded city so "Use current location" actually
+    // fills the field instead of only showing a message
+    LaunchedEffect(detectedDistrict) {
+        if (!detectedDistrict.isNullOrBlank() && district.isBlank()) district = detectedDistrict
+    }
 
     Dialog(onDismissRequest = {}) {
         UiCard {
@@ -45,7 +52,7 @@ fun OnboardingDistrictDialog(
                     shape = RoundedCornerShape(10.dp)
                 )
                 ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    DISTRICTS.forEach { d ->
+                    (listOfNotNull(detectedDistrict?.takeIf { it.isNotBlank() }) + DISTRICTS).distinct().forEach { d ->
                         DropdownMenuItem(text = { Text(d) }, onClick = { district = d; expanded = false })
                     }
                 }
