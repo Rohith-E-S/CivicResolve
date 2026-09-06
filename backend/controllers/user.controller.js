@@ -216,9 +216,15 @@ export const updateProfile = async (req, res) => {
     const updateData = { address, fullName };
 
     if (req.file) {
-      const upload = await cloudinary.uploader.upload(req.file.path);
-      updateData.profilePic = upload.secure_url;
-      fs.unlinkSync(req.file.path);
+      try {
+        const upload = await cloudinary.uploader.upload(req.file.path);
+        updateData.profilePic = upload.secure_url;
+      } finally {
+        // The temp file must not linger when the Cloudinary upload fails
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch {}
+      }
     }
 
     const updatedUser = await User.findByIdAndUpdate(userID, updateData, {
