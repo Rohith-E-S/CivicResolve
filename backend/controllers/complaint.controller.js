@@ -1689,7 +1689,7 @@ export const verifyComplaint = async (req, res) => {
     const { id } = req.params;
     const { latitude, longitude } = req.body;
 
-    const complaint = await Complaint.findOne({ _id: id, ...ACTIVE_COMPLAINT_QUERY });
+    let complaint = await Complaint.findOne({ _id: id, ...ACTIVE_COMPLAINT_QUERY });
     if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
 
     if (complaint.status !== "pending_verification") {
@@ -1723,21 +1723,58 @@ export const verifyComplaint = async (req, res) => {
       return res.status(400).json({ success: false, message: "You must be within 500m of the issue to verify it" });
     }
 
-    // Atomic update
-    complaint.verifications.push({
-      userId: req.user._id,
-      location: { type: "Point", coordinates: [verifyLng, verifyLat] }
-    });
-    complaint.verificationCount = complaint.verifications.length;
+    // Atomic update: push the verification and derive the count in one
+    // server-side operation (a read-modify-write here could lose concurrent
+    // verifications, breaking the 3-verification resolution threshold)
+    complaint = await Complaint.findOneAndUpdate(
+      {
+        _id: id,
+        ...ACTIVE_COMPLAINT_QUERY,
+        status: "pending_verification",
+        "verifications.userId": { $ne: req.user._id },
+      },
+      [
+        {
+          $set: {
+            verifications: {
+              $concatArrays: [
+                "$verifications",
+                [{
+                  userId: req.user._id,
+                  timestamp: "$$NOW",
+                  location: { type: "Point", coordinates: [verifyLng, verifyLat] },
+                }],
+              ],
+            },
+          },
+        },
+        { $set: { verificationCount: { $size: "$verifications" } } },
+      ],
+      { new: true }
+    );
 
-    // Check if 3 verifications reached
-    if (complaint.verificationCount >= 3) {
-      complaint.status = "resolved";
-      if (!complaint.timestamps) complaint.timestamps = {};
-      complaint.timestamps.resolved = new Date();
+    if (!complaint) {
+      return res.status(409).json({ success: false, message: "You have already verified this report or the complaint is no longer in verification" });
     }
 
-    await complaint.save();
+    // Check if 3 verifications reached — flip atomically so a concurrent
+    // verifier cannot double-fire the transition
+    if (complaint.verificationCount >= 3) {
+      complaint = await Complaint.findOneAndUpdate(
+        { _id: id, status: "pending_verification" },
+        [
+          {
+            $set: {
+              status: "resolved",
+              timestamps: {
+                $mergeObjects: ["$timestamps", { resolved: "$$NOW" }],
+              },
+            },
+          },
+        ],
+        { new: true }
+      );
+    }
     
     // Award points to the verifier
     await awardPoints(req.user._id, "verified_issue", req.app.get("io"));
