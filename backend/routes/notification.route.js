@@ -6,13 +6,15 @@ import {
   markOneRead,
   clearAll,
 } from "../controllers/notification.controller.js";
+import { protectRoute } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-router.get("/:userId",              getNotifications);
-router.get("/:userId/unread-count", getUnreadCount);
-router.patch("/:userId/read-all",   markAllRead);
-router.patch("/:id/read",           markOneRead);
-router.delete("/:userId",           clearAll);
+// All notification routes operate on the authenticated user's own data.
+router.get("/",                   protectRoute, getNotifications);
+router.get("/unread-count",       protectRoute, getUnreadCount);
+router.patch("/read-all",         protectRoute, markAllRead);
+router.patch("/:id/read",         protectRoute, markOneRead);
+router.delete("/",                protectRoute, clearAll);
 
 export default router;
