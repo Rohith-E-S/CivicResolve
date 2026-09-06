@@ -19,6 +19,12 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Base URL of the backend (REST + socket). Override per environment
+        // with -PapiBaseUrl=https://your-host ; the app reads
+        // BuildConfig.API_BASE_URL
+        val apiBaseUrl = (project.findProperty("apiBaseUrl") as String?) ?: "https://ankle-paper-magnify.ngrok-free.dev"
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {
@@ -38,6 +44,7 @@ android {
         compose = true
         buildConfig = true
     }
+
 }
 
 dependencies {
