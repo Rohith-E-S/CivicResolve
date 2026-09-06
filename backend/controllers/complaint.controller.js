@@ -1863,8 +1863,16 @@ export const resolveDispute = async (req, res) => {
     const { id } = req.params;
     const { action } = req.body; // "reopen" or "confirm"
 
+    if (!["reopen", "confirm"].includes(action)) {
+      return res.status(400).json({ success: false, message: "Invalid action — must be 'reopen' or 'confirm'" });
+    }
+
     const complaint = await Complaint.findOne({ _id: id, ...ACTIVE_COMPLAINT_QUERY });
     if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
+
+    if (complaint.status !== "disputed" || !complaint.dispute) {
+      return res.status(400).json({ success: false, message: "Complaint has no active dispute to resolve" });
+    }
 
     const disputerId = complaint.dispute?.userId;
 
