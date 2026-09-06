@@ -44,7 +44,12 @@ const AdminDashboard = () => {
     fetchStats();
   }, [fetchStats, navigate]);
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await API.post("/auth/logout");
+    } catch {
+      // clear local session even if the server call fails
+    }
     localStorage.removeItem("userData");
     localStorage.removeItem("token");
     navigate("/");

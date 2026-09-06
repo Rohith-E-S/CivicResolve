@@ -191,7 +191,7 @@ export const login = async (req, res) => {
 // -------------------------------------------------------------
 export const logout = async (req, res) => {
   try {
-    res.cookie("token", null, { expires: new Date(Date.now()) });
+    res.clearCookie("token");
     return res.json({ success: true, message: "Logged out successfully" });
   } catch (error) {
     return res.status(500).json({
