@@ -418,7 +418,7 @@ export const sendPasswordResetOtp = async (req, res) => {
     return res.json({ success: true, message: "OTP sent successfully" });
   } catch (error) {
     console.log(error.message);
-    return res.status(404).json({ success: false, message: error.messsage });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
