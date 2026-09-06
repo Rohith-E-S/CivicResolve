@@ -30,7 +30,6 @@ fun ComplaintChatScreen(
     val chatVm: ChatViewModel = viewModel(factory = ChatViewModelFactory(appContainer.complaintRepository, appContainer))
     val detailState by detailVm.state.collectAsState()
     val chatState by chatVm.state.collectAsState()
-    var toUserId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(complaintId) {
         detailVm.fetchComplaint(complaintId)
@@ -40,7 +39,6 @@ fun ComplaintChatScreen(
         val c = detailState.complaint
         val user = authState.user
         if (c != null && user != null) {
-            toUserId = c.user?.id
             chatVm.connect(complaintId, user.id ?: "")
         }
     }
@@ -66,8 +64,7 @@ fun ComplaintChatScreen(
                 currentUserId = authState.user?.id,
                 chattingWith = if (authState.user?.isAdmin == true) detailState.complaint?.user?.fullName ?: "Citizen" else "Admin",
                 onSendMessage = { msg ->
-                    val to = toUserId ?: detailState.complaint?.user?.id ?: return@ChatBox
-                    chatVm.sendMessage(complaintId, to, msg)
+                    chatVm.sendMessage(complaintId, msg)
                 },
                 modifier = Modifier.weight(1f)
             )

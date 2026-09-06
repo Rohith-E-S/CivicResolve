@@ -66,8 +66,9 @@ const ComplaintChat = () => {
 
   const handleSendMessage = (message) => {
     if (!complaint || !currentUser) return;
-    const toUser = complaint.user._id;
-    socket.emit("sendMessage", { complaintId, toUser, message });
+    // Recipient is resolved server-side (owner for admins, a district admin
+    // for citizens) — never send identity data from the client
+    socket.emit("sendMessage", { complaintId, message });
   };
 
   if (loading) return <div className="ui-page ui-empty">Loading chat...</div>;
