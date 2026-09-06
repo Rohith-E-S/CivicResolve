@@ -103,7 +103,7 @@ const Explore = () => {
     let list = [...complaints];
     if (filter !== "all") {
       if (filter === "active") {
-        list = list.filter((c) => ["in_progress", "in progress", "re_opened", "pending_verification", "disputed"].includes(c.status));
+        list = list.filter((c) => ["new", "under_review", "in_progress", "in progress", "re_opened", "pending_verification", "disputed"].includes(c.status));
       } else if (filter === "resolved") {
         list = list.filter((c) => ["resolved", "confirmed_resolved"].includes(c.status));
       } else {
