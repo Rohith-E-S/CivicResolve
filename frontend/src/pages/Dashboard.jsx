@@ -49,6 +49,17 @@ const Dashboard = () => {
     localStorage.setItem("dashboardActiveTab", activeTab);
   }, [activeTab]);
 
+  // External navigators (Command palette, Explore bottom nav) request a tab
+  // switch via this event — localStorage alone can't re-trigger a tab change
+  // when /dashboard is already open
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail) setActiveTab(e.detail);
+    };
+    window.addEventListener("dashboard:tab", handler);
+    return () => window.removeEventListener("dashboard:tab", handler);
+  }, []);
+
   const fetchStats = async () => {
     setLoading(true);
     try {
