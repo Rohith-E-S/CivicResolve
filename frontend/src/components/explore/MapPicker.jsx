@@ -20,10 +20,10 @@ const MapEvents = ({ onMove }) => {
       onMove(c.lat, c.lng);
     },
   });
-  useEffect(() => {
-    const c = map.getCenter();
-    onMove(c.lat, c.lng);
-  }, []);
+  // Deliberately no onMove on mount: firing it with the default map center
+  // used to pre-fill the form coordinates without any user action, which
+  // defeated the "set a pin" submit guard and auto-geocoded the default
+  // location
   return null;
 };
 
