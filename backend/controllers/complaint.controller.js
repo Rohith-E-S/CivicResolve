@@ -1357,6 +1357,7 @@ export const updateMyComplaint = async (req, res) => {
     ];
 
     let updatedFieldCount = 0;
+    let coordsChanged = false;
     allowedFields.forEach((field) => {
       if (typeof req.body[field] !== "string") {
         return;
@@ -1368,6 +1369,7 @@ export const updateMyComplaint = async (req, res) => {
       }
 
       complaint[field] = value;
+      if (field === "latitude" || field === "longitude") coordsChanged = true;
       updatedFieldCount += 1;
     });
 
@@ -1376,6 +1378,17 @@ export const updateMyComplaint = async (req, res) => {
         success: false,
         message: "Provide at least one valid field to update",
       });
+    }
+
+    // Keep the GeoJSON location in sync with edited coordinates so geo
+    // queries ($nearSphere) and the 500m verification distance check keep
+    // matching the actual pin
+    if (coordsChanged) {
+      const lat = parseFloat(complaint.latitude);
+      const lng = parseFloat(complaint.longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        complaint.location = { type: "Point", coordinates: [lng, lat] };
+      }
     }
 
     await complaint.save();
