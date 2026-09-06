@@ -14,11 +14,15 @@ import ComplaintChat from "./pages/ComplaintChat";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import ThemeToggle from "./components/ThemeToggle";
+import Explore from "./pages/Explore";
+import MapView from "./pages/MapView";
+import CommandPalette from "./components/CommandPalette";
 
 function App() {
   return (
     <Router>
       <ThemeProvider>
+        <CommandPalette />
         <ThemeToggle className="fixed bottom-3 right-3 z-[80]" />
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -67,6 +71,22 @@ function App() {
           <Route path="/otp-verify" element={<OtpVerify />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:id" element={<ResetPasswordPage />} />
+          <Route
+            path="/explore"
+            element={
+              <ProtectedRoute>
+                <Explore />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/map"
+            element={
+              <ProtectedRoute>
+                <MapView />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </ThemeProvider>
     </Router>

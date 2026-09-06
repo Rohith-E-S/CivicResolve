@@ -7,9 +7,16 @@ import NewComplaint from "../components/dashboard/NewComplaint";
 import Profile from "../components/dashboard/Profile";
 import UserChats from "../components/dashboard/UserChats";
 import AppHeader from "../components/AppHeader";
+import OnboardingDistrict from "../components/OnboardingDistrict";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState(localStorage.getItem("dashboardActiveTab") || "overview");
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebarCollapsed") === "true");
+  const toggleCollapsed = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem("sidebarCollapsed", String(next));
+  };
   const [stats, setStats] = useState({
     total: 0,
     newComplaint: 0,
@@ -35,6 +42,7 @@ const Dashboard = () => {
     profilePic: null,
     previewUrl: null,
   });
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -61,6 +69,9 @@ const Dashboard = () => {
         address: parsed.address,
         previewUrl: parsed.profilePic || null,
       });
+      if (!parsed.homeDistrict || parsed.homeDistrict.trim() === "") {
+        setShowOnboarding(true);
+      }
     }
     fetchStats();
   }, []);
@@ -75,21 +86,40 @@ const Dashboard = () => {
     <div className="ui-page ui-page-dashboard">
       <AppHeader
         brandTo="/dashboard"
-        brandInitial="C"
-        brandLabel="Complaint Register Portal"
-        title="Citizen dashboard"
+        brandInitial="⬢"
+        brandLabel="CivicResolve"
+        title="Citizen ledger"
         subtitle="Case tracking and submissions"
         actions={
           <div className="app-header__user">
             <span className="app-header__user-name">{user?.fullName || "Citizen"}</span>
-            <span className="app-header__user-meta">Account portal</span>
+            <span className="app-header__user-meta">CIV-{String(stats.total || 0).padStart(4, "0")} • Ledger</span>
           </div>
         }
       />
 
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} logout={logout} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} logout={logout} collapsed={collapsed} onToggle={toggleCollapsed} />
 
-      <main className="px-3 py-4 pb-20 md:ml-56 md:px-4 md:pb-6">
+      {showOnboarding && user && (
+        <OnboardingDistrict
+          user={user}
+          onComplete={(updated) => {
+            setUser(updated);
+            setShowOnboarding(false);
+          }}
+        />
+      )}
+
+      <button
+        onClick={() => setActiveTab("new-complaint")}
+        className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[color:var(--ui-accent-strong)] text-white shadow-lg hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ui-focus)] md:bottom-6 md:right-6 md:h-12 md:w-12"
+        aria-label="Report new issue"
+        title="Report new issue (N)"
+      >
+        <span className="material-symbols-outlined text-[24px]">add_location</span>
+      </button>
+
+      <main className={`px-3 py-4 pb-20 md:px-4 md:pb-6 will-change-[margin] transition-[margin] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${collapsed ? "md:ml-14" : "md:ml-56"}`}>
         <div className="mx-auto max-w-[1500px] space-y-4">
           {activeTab === "overview" && (
             <Overview stats={stats} loading={loading} setActiveTab={setActiveTab} user={user} />
@@ -128,6 +158,9 @@ const Dashboard = () => {
         </button>
         <button onClick={() => setActiveTab("new-complaint")} className="ui-btn ui-btn-ghost">
           New
+        </button>
+        <button onClick={() => navigate("/explore")} className="ui-btn ui-btn-ghost">
+          Explore
         </button>
         <button onClick={() => setActiveTab("chats")} className="ui-btn ui-btn-ghost">
           Chats

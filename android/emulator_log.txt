@@ -1,7 +1,0 @@
-INFO         | Android emulator version 36.5.11.0 (build_id 15261927) (CL:N/A)
-INFO         | Graphics backend: gfxstream
-DEBUG   | Current emulator version 36.5.11 is the same as the required version 36.5.11.
-INFO         | Found AVD name 'Medium_Phone_API_36.1'
-INFO         | Found AVD target architecture: x86_64
-INFO         | argv[0]: '/home/prakhar/Android/Sdk/emulator/emulator'; program directory: '/home/prakhar/Android/Sdk/emulator'
-INFO         | Found systemPath /home/prakhar/Android/Sdk/system-images/android-36.1/google_apis_playstore/x86_64/

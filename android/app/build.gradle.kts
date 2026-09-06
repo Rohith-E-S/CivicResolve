@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.complaintportal"
+    namespace = "com.civicresolve.ap"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -12,8 +12,8 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.complaintportal"
-        minSdk = 29
+        applicationId = "com.civicresolve.ap"
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -54,8 +54,8 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.security.crypto)
     implementation(libs.google.play.services.auth)
-    implementation(libs.google.play.services.location)
-    
+    implementation(libs.androidx.datastore.preferences)
+
     // Third party
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.moshi)
@@ -67,10 +67,9 @@ dependencies {
     implementation(libs.moshi)
     implementation(libs.moshi.kotlin)
     implementation(libs.osmdroid.android)
-    implementation(libs.ucrop)
-    implementation(libs.mpandroidchart)
     implementation(libs.play.services.location)
-    implementation(libs.lottie.compose)
+    implementation(libs.vico.compose)
+    implementation(libs.vico.compose.m3)
     implementation(libs.kotlinx.coroutines.play.services)
 
     testImplementation(libs.junit)

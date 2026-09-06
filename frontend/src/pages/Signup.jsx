@@ -61,9 +61,11 @@ const Signup = () => {
   return (
     <div className="ui-page">
       <main className="ui-container py-10 sm:py-16">
-        <div className="mx-auto max-w-xl ui-card">
-          <h1 className="ui-title">Create account</h1>
-          <p className="ui-subtitle">Register to submit and track complaints.</p>
+        <div className="mx-auto max-w-xl ui-card relative overflow-hidden">
+          <div className="absolute left-0 top-0 h-full w-1 bg-[color:var(--ui-accent-strong)]" />
+          <p className="ui-mono text-[color:var(--ui-accent-strong)]">New ledger entry • Step 1 of 2</p>
+          <h1 className="ui-display text-3xl mt-2">Create account</h1>
+          <p className="text-sm text-[color:var(--ui-text-muted)] mt-2">Takes 45 seconds. You’ll verify your email next.</p>
 
           {error && <div className="ui-alert ui-alert-error mt-5">{error}</div>}
 

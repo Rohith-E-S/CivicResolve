@@ -65,17 +65,19 @@ const ComplaintOverviewPage = () => {
       />
 
       <main className="ui-container py-6">
-        <section className="ui-card mb-6">
+        <section className="hero-blueprint p-5 mb-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <span className={getStatusBadgeClass(complaint.status)}>{complaint.status}</span>
-              <h1 className="ui-title mt-3">{complaint.description || "Reported issue"}</h1>
-              <p className="ui-subtitle">
-                #{complaint._id.slice(-8).toUpperCase()} • {new Date(complaint.createdAt).toLocaleDateString()}
-              </p>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="ui-stencil">CIV-{complaint._id.slice(-6).toUpperCase()}</span>
+                <span className={getStatusBadgeClass(complaint.status)}>{complaint.status}</span>
+                <span className="text-xs text-[color:var(--ui-text-muted)]">• {complaint.category?.replace(/_/g, " ")}</span>
+              </div>
+              <h1 className="ui-display text-2xl mt-3 leading-tight">{complaint.description || "Reported issue"}</h1>
+              <p className="ui-mono text-xs mt-2 text-[color:var(--ui-text-muted)]">Filed {new Date(complaint.createdAt).toLocaleDateString()} • {complaint.city} • ID #{complaint._id.slice(-8).toUpperCase()}</p>
             </div>
-            <Link to={`/complaint/${id}/chat`} className="ui-btn ui-btn-primary">
-              Open chat
+            <Link to={`/complaint/${id}/chat`} className="ui-btn ui-btn-primary shrink-0">
+              <span className="material-symbols-outlined text-[18px]">chat</span> Open chat
             </Link>
           </div>
         </section>
@@ -151,21 +153,19 @@ const ComplaintOverviewPage = () => {
             )}
 
             <article className="ui-card">
-              <h2 className="text-base font-semibold">Timeline</h2>
-              <ul className="mt-3 space-y-3 text-sm">
-                <li>
-                  <strong>Created:</strong>{" "}
-                  <span className="text-[color:var(--ui-text-muted)]">
-                    {new Date(complaint.createdAt).toLocaleString()}
-                  </span>
-                </li>
-                <li>
-                  <strong>Last updated:</strong>{" "}
-                  <span className="text-[color:var(--ui-text-muted)]">
-                    {new Date(complaint.updatedAt).toLocaleString()}
-                  </span>
-                </li>
-              </ul>
+              <h2 className="text-base font-semibold" style={{ fontFamily: "Instrument Serif, serif" }}>Timeline</h2>
+              <div className="mt-4 space-y-3">
+                {[
+                  { label: "Reported", date: complaint.createdAt, dot: "#e53935" },
+                  { label: "Last update", date: complaint.updatedAt, dot: complaint.status === "resolved" ? "#0E9F6E" : "#FFB74D" },
+                ].map((t) => (
+                  <div key={t.label} className="ledger-line">
+                    <p className="text-xs font-bold tracking-widest uppercase" style={{ color: t.dot }}>{t.label}</p>
+                    <p className="text-sm text-[color:var(--ui-text-muted)]">{new Date(t.date).toLocaleString()}</p>
+                  </div>
+                ))}
+                <p className="ui-mono text-[10px] mt-3">Status: {complaint.status} • Support: {complaint.supportCount || 0}</p>
+              </div>
             </article>
           </aside>
         </section>

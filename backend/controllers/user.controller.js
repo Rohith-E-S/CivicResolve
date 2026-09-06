@@ -27,6 +27,8 @@ export const sendOtp = async (req, res) => {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
+    await OTP.deleteMany({ email });
+
     await OTP.create({
       email,
       otp,
@@ -77,7 +79,7 @@ export const verifyOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
 
-    const record = await OTP.findOne({ email });
+    const record = await OTP.findOne({ email }).sort({ createdAt: -1 });
 
     if (!record)
       return res.status(400).json({ success: false, message: "OTP expired" });
@@ -311,6 +313,8 @@ export const sendPasswordResetOtp = async (req, res) => {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
+    await OTP.deleteMany({ email, isForgotPassword: true });
+
     await OTP.create({
       email,
       otp,
@@ -363,7 +367,7 @@ export const verifyPasswordResetOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
 
-    const record = await OTP.findOne({ email, isForgotPassword: true });
+    const record = await OTP.findOne({ email, isForgotPassword: true }).sort({ createdAt: -1 });
 
     if (!record)
       return res.status(400).json({ success: false, message: "OTP expired" });

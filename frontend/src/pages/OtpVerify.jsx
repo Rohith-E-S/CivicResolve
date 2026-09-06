@@ -64,9 +64,11 @@ const OtpVerify = () => {
   return (
     <div className="ui-page">
       <main className="ui-container py-10 sm:py-16">
-        <div className="mx-auto max-w-xl ui-card">
-          <h1 className="ui-title">Verify your email</h1>
-          <p className="ui-subtitle">Enter the 6-digit code sent to your inbox.</p>
+        <div className="mx-auto max-w-xl ui-card relative overflow-hidden">
+          <div className="absolute left-0 top-0 h-full w-1 bg-[color:var(--ui-success)]" />
+          <p className="ui-mono text-[color:var(--ui-success)]">Step 2 of 2 • Check your inbox</p>
+          <h1 className="ui-display text-3xl mt-2">Verify your email</h1>
+          <p className="text-sm text-[color:var(--ui-text-muted)] mt-2">Enter the 6-digit code sent to {email || "your inbox"}. Valid for 5 minutes.</p>
 
           {error && <div className="ui-alert ui-alert-error mt-5">{error}</div>}
 

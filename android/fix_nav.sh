@@ -1,8 +1,0 @@
-#!/bin/bash
-sed -i 's/    } else {/    } else {\n        SharedTransitionLayout {\n            CompositionLocalProvider(LocalSharedTransitionScope provides this) {/g' app/src/main/java/com/example/complaintportal/ui/navigation/AppNavigation.kt
-
-sed -i 's/        NavHost(/                NavHost(/g' app/src/main/java/com/example/complaintportal/ui/navigation/AppNavigation.kt
-sed -i 's/            navController = navController,/                    navController = navController,/g' app/src/main/java/com/example/complaintportal/ui/navigation/AppNavigation.kt
-sed -i 's/            startDestination = if (authState.isAuthenticated) Screen.Dashboard.route else Screen.Login.route/                    startDestination = if (authState.isAuthenticated) Screen.Dashboard.route else Screen.Login.route,\n                    enterTransition = { slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(300)) + fadeIn(animationSpec = tween(300)) },\n                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(300)) + fadeOut(animationSpec = tween(300)) },\n                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) + fadeIn(animationSpec = tween(300)) },\n                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(300)) + fadeOut(animationSpec = tween(300)) }/g' app/src/main/java/com/example/complaintportal/ui/navigation/AppNavigation.kt
-
-sed -i 's/        }/                }\n            }\n        }/g' app/src/main/java/com/example/complaintportal/ui/navigation/AppNavigation.kt

@@ -23,5 +23,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Complaintportal"
+rootProject.name = "CivicResolve"
 include(":app")

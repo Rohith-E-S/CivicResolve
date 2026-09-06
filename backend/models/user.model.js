@@ -73,11 +73,9 @@ const userSchema = new mongoose.Schema(
       type: {
         type: String,
         enum: ["Point"],
-        default: "Point",
       },
       coordinates: {
         type: [Number], // [longitude, latitude]
-        default: undefined, // not set until user shares location
       },
     },
 
@@ -108,7 +106,7 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-userSchema.index({ lastLocation: "2dsphere" });
+userSchema.index({ lastLocation: "2dsphere" }, { partialFilterExpression: { "lastLocation.coordinates": { $exists: true } } });
 
 userSchema.methods.getJWT = function () {
   return jwt.sign({ _id: this.id }, process.env.JWT_SECRET_KEY, {

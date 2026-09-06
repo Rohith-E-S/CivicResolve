@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Hex monogram on parchment -->
+    <path
+        android:fillColor="#0B0F1A"
+        android:pathData="M54,18 L78,32 L78,62 L54,76 L30,62 L30,32 Z" />
+    <!-- Inner hex cut / accent -->
+    <path
+        android:fillColor="#F6F3EB"
+        android:pathData="M54,28 L69,36.5 L69,59.5 L54,68 L39,59.5 L39,36.5 Z" />
+    <!-- Center dot -->
+    <path
+        android:fillColor="#1A56DB"
+        android:pathData="M54,44 A10,10 0 1,1 54,64 A10,10 0 0,1 54,44 Z" />
+    <!-- Small accent dot bottom -->
+    <path
+        android:fillColor="#FF6B2B"
+        android:pathData="M54,66 A3,3 0 1,1 54,72 A3,3 0 0,1 54,66 Z" />
+</vector>

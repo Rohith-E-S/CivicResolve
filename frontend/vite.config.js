@@ -14,5 +14,19 @@ export default defineConfig({
         secure: false
       }
     }
-  }
+  },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          leaflet: ['leaflet', 'react-leaflet'],
+          vendor: ['axios', 'socket.io-client', 'jwt-decode', '@react-oauth/google'],
+          charts: ['recharts'],
+          ui: ['lucide-react'],
+        },
+      },
+    },
+  },
 })

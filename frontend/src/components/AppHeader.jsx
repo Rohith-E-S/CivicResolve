@@ -10,7 +10,7 @@ const AppHeader = ({
 }) => {
   return (
     <header className="app-header">
-      <div className="ui-container app-header__inner">
+      <div className="app-header__inner">
         <div className="app-header__left">
           <Link to={brandTo} className="app-header__brand">
             <span className="ui-brand-mark">{brandInitial}</span>

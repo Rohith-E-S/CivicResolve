@@ -1,3 +1,0 @@
-INFO         | Android emulator version 36.5.11.0 (build_id 15261927) (CL:N/A)
-INFO         | Graphics backend: gfxstream
-INFO         | Found systemPath /home/prakhar/Android/Sdk/system-images/android-36.1/google_apis_playstore/x86_64/

@@ -1,7 +1,0 @@
-INFO         | Android emulator version 36.5.11.0 (build_id 15261927) (CL:N/A)
-INFO         | Graphics backend: gfxstream
-DEBUG   | Current emulator version 36.5.11 is the same as the required version 36.5.11.
-INFO         | Found AVD name 'Pixel_9_Pro'
-INFO         | Found AVD target architecture: x86_64
-INFO         | argv[0]: '/home/prakhar/Android/Sdk/emulator/emulator'; program directory: '/home/prakhar/Android/Sdk/emulator'
-INFO         | Found systemPath /home/prakhar/Android/Sdk/system-images/android-37.0/google_apis_playstore_ps16k/x86_64/
