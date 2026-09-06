@@ -25,6 +25,7 @@ const Signup = () => {
     try {
       const decoded = jwtDecode(response.credential);
       const res = await API.post("/auth/google-login", {
+        credential: response.credential,
         email: decoded.email,
         fullName: decoded.name,
         profilePic: decoded.picture,
@@ -33,7 +34,7 @@ const Signup = () => {
 
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("userData", JSON.stringify(res.data.user));
-      navigate("/dashboard");
+      navigate(res.data.user.isAdmin ? "/admin-dashboard" : "/dashboard");
     } catch (err) {
       console.error(err);
       setError("Google login failed");
