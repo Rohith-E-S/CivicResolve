@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       minLength: 6,
+      select: false,
     },
 
     googleId: {
@@ -61,11 +62,13 @@ const userSchema = new mongoose.Schema(
     resetPasswordToken: {
       type: String,
       default: null,
+      select: false,
     },
 
     resetPasswordExpires: {
       type: Date,
       default: null,
+      select: false,
     },
 
     // Last known GPS location (updated from the Android app)
@@ -86,6 +89,7 @@ const userSchema = new mongoose.Schema(
     fcmToken: {
       type: String,
       default: null,
+      select: false,
     },
     civicPoints: {
       type: Number,

@@ -145,7 +145,7 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
     console.log(`[Login] Attempt for email: ${email}`);
 
-    const userData = await User.findOne({ email });
+    const userData = await User.findOne({ email }).select("+password");
 
     if (!userData) {
       console.log(`[Login] User not found: ${email}`);
