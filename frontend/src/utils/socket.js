@@ -12,8 +12,12 @@ const getToken = () => {
     return null;
 };
 
+// Same-origin by default (matches the REST baseURL strategy); the Vite dev
+// proxy forwards /socket.io, and deployments can override via VITE_SOCKET_URL
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
+
 // Create socket instance
-const socket = io("http://localhost:4000", {
+const socket = io(SOCKET_URL, {
     withCredentials: true,
     auth: {
         token: getToken(),
