@@ -692,6 +692,7 @@ export const updateAfterImageUrl = async (req, res) => {
     }
 
     complaint.afterImageUrl = imageUrl;
+    const oldStatus = complaint.status;
     complaint.status = "pending_verification";
     if (!complaint.timestamps) complaint.timestamps = {};
     complaint.timestamps.pendingVerification = new Date();
@@ -715,8 +716,8 @@ export const updateAfterImageUrl = async (req, res) => {
     notifyStatusChanged(io, {
       complaintOwnerId: complaint.user,
       complaintId,
-      oldStatus: "in_progress",
-      newStatus: "resolved",
+      oldStatus,
+      newStatus: "pending_verification",
       category: complaint.category,
     }).catch(err => console.error("Notification failed:", err.message));
 
@@ -813,6 +814,10 @@ export const updateComplaint = async (req, res) => {
       });
     }
 
+    // Capture the original status before any mutation so the owner's
+    // notification reports a real old -> new transition
+    const previousStatus = complaint.status;
+
     if (req.file) {
       try {
         const uploaded = await cloudinary.uploader.upload(req.file.path);
@@ -835,8 +840,6 @@ export const updateComplaint = async (req, res) => {
       complaint.status = normalizedStatus;
     }
 
-    // Push in-app notification to complaint owner
-    const previousStatus = complaint.status; // captured before save
     await complaint.save();
 
     // Socket broadcasting
