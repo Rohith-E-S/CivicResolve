@@ -153,7 +153,7 @@ fun AppNavigation(
                             val pending = authViewModel.pendingSignupRequest
                             if (pending != null) {
                                 authViewModel.createAccount(pending) {
-                                    navController.navigate(Screen.Dashboard.route) { popUpTo(Screen.Signup.route) { inclusive = true } }
+                                    navController.navigate(Screen.Dashboard.createRoute()) { popUpTo(Screen.Signup.route) { inclusive = true } }
                                 }
                             } else navController.navigate(Screen.Login.route)
                         }
@@ -282,7 +282,7 @@ fun AppNavigation(
             }
             composable(Screen.AdminDashboard.route) {
                 if (authState.user?.isAdmin != true) {
-                    LaunchedEffect(Unit) { navController.navigate(Screen.Dashboard.route) { popUpTo(Screen.AdminDashboard.route) { inclusive = true } } }
+                    LaunchedEffect(Unit) { navController.navigate(Screen.Dashboard.createRoute()) { popUpTo(Screen.AdminDashboard.route) { inclusive = true } } }
                 } else {
                     AdminDashboardScreen(
                         appContainer = appContainer,
