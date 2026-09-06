@@ -1,6 +1,6 @@
 export const getStatusBadgeClass = (status = "") => {
-  const normalized = status.toLowerCase();
-  if (normalized === "resolved") return "ui-badge ui-badge-resolved";
-  if (normalized === "in progress") return "ui-badge ui-badge-progress";
+  const s = status.toLowerCase();
+  if (s === "resolved" || s === "confirmed_resolved") return "ui-badge ui-badge-resolved";
+  if (["in_progress", "in progress", "re_opened", "pending_verification", "disputed"].includes(s)) return "ui-badge ui-badge-progress";
   return "ui-badge ui-badge-new";
 };
