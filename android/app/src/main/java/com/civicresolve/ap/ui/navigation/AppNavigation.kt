@@ -73,7 +73,7 @@ fun AppNavigation(
             val current = navController.currentDestination?.route
             if (authState.isAuthenticated) {
                 if (current == Screen.Login.route || current == Screen.Signup.route || current == Screen.Landing.route) {
-                    val dest = if (authState.user?.isAdmin == true) Screen.AdminDashboard.route else Screen.Dashboard.route
+                    val dest = if (authState.user?.isAdmin == true) Screen.AdminDashboard.route else Screen.Dashboard.createRoute()
                     navController.navigate(dest) { popUpTo(Screen.Landing.route) { inclusive = true } }
                 }
             }
@@ -97,7 +97,7 @@ fun AppNavigation(
                     onLogin = { navController.navigate(Screen.Login.route) },
                     onSignup = { navController.navigate(Screen.Signup.route) },
                     onDashboard = {
-                        val dest = if (authState.user?.isAdmin == true) Screen.AdminDashboard.route else Screen.Dashboard.route
+                        val dest = if (authState.user?.isAdmin == true) Screen.AdminDashboard.route else Screen.Dashboard.createRoute()
                         navController.navigate(dest)
                     },
                     onExplore = { navController.navigate(Screen.Explore.route) },
@@ -114,7 +114,7 @@ fun AppNavigation(
                         onLogin = { email, pass ->
                             error = null
                             authViewModel.login(com.civicresolve.ap.data.model.LoginRequest(email, pass)) {
-                                val dest = if (authViewModel.authState.value.user?.isAdmin == true) Screen.AdminDashboard.route else Screen.Dashboard.route
+                                val dest = if (authViewModel.authState.value.user?.isAdmin == true) Screen.AdminDashboard.route else Screen.Dashboard.createRoute()
                                 navController.navigate(dest) { popUpTo(Screen.Login.route) { inclusive = true } }
                             }
                         },
@@ -232,7 +232,7 @@ fun AppNavigation(
                     onOpenComplaint = { id -> navController.navigate(Screen.ComplaintOverview.createRoute(id)) },
                     onDashboardTab = { tab -> navController.navigate(Screen.Dashboard.createRoute(tab)) },
                     onDashboard = {
-                        val dest = if (authState.user?.isAdmin == true) Screen.AdminDashboard.route else Screen.Dashboard.route
+                        val dest = if (authState.user?.isAdmin == true) Screen.AdminDashboard.route else Screen.Dashboard.createRoute()
                         navController.navigate(dest) { popUpTo(Screen.Explore.route) { inclusive = true } }
                     },
                     onMap = { navController.navigate(Screen.MapView.route) }
@@ -243,7 +243,7 @@ fun AppNavigation(
                     appContainer = appContainer,
                     authViewModel = authViewModel,
                     onDashboard = {
-                        val dest = if (authState.user?.isAdmin == true) Screen.AdminDashboard.route else Screen.Dashboard.route
+                        val dest = if (authState.user?.isAdmin == true) Screen.AdminDashboard.route else Screen.Dashboard.createRoute()
                         navController.navigate(dest) { popUpTo(Screen.MapView.route) { inclusive = true } }
                     },
                     onOpenComplaint = { id -> navController.navigate(Screen.ComplaintOverview.createRoute(id)) }
