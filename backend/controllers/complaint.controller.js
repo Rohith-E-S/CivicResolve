@@ -1066,7 +1066,9 @@ export const getComplaintStats = async (req, res) => {
     const inProgressComplaint = complaints.filter(
       (c) => c.status === "in_progress"
     );
-    const resolvedComplaint = complaints.filter((c) => c.status === "resolved");
+    const resolvedComplaint = complaints.filter(
+      (c) => c.status === "resolved" || c.status === "confirmed_resolved"
+    );
 
     res.status(200).json({
       success: true,
@@ -1645,7 +1647,7 @@ export const getPublicStats = async (req, res) => {
 
     const totalResolved = await Complaint.countDocuments({
       ...query,
-      status: "resolved",
+      status: { $in: ["resolved", "confirmed_resolved"] },
     });
 
     const totalActive = await Complaint.countDocuments({

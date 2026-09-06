@@ -2,6 +2,9 @@ import Complaint from "../models/complaint.model.js";
 import User from "../models/user.model.js";
 import mongoose from "mongoose";
 
+const ACTIVE_QUERY = { isDeleted: { $ne: true } };
+const RESOLVED_STATUSES = ["resolved", "confirmed_resolved"];
+
 export const getUserAnalytics = async (req, res) => {
   try {
     const userIdStr = req.user._id;
@@ -15,7 +18,7 @@ export const getUserAnalytics = async (req, res) => {
     const { period = "This Month" } = req.query;
 
     // Calculate date filter
-    let dateFilter = { user: userId };
+    let dateFilter = { user: userId, ...ACTIVE_QUERY };
     const now = new Date();
     
     if (period === "This Week") {
@@ -35,7 +38,7 @@ export const getUserAnalytics = async (req, res) => {
     // 1. Basic Stats
     const complaints = await Complaint.find(dateFilter);
     const totalReports = complaints.length;
-    const resolvedCount = complaints.filter(c => c.status.toLowerCase() === "resolved").length;
+    const resolvedCount = complaints.filter(c => RESOLVED_STATUSES.includes(c.status)).length;
     const activeCount = complaints.filter(c => c.status.toLowerCase() === "in_progress").length;
     const newCount = complaints.filter(c => c.status.toLowerCase() === "new").length;
 
@@ -48,6 +51,7 @@ export const getUserAnalytics = async (req, res) => {
       {
         $match: {
           user: userId,
+          ...ACTIVE_QUERY,
           createdAt: { $gte: sevenDaysAgo }
         }
       },
@@ -76,7 +80,7 @@ export const getUserAnalytics = async (req, res) => {
 
     // 3. Category Breakdown
     const categoryBreakdown = await Complaint.aggregate([
-      { $match: { user: userId } },
+      { $match: { user: userId, ...ACTIVE_QUERY } },
       {
         $group: {
           _id: "$category",
@@ -95,7 +99,7 @@ export const getUserAnalytics = async (req, res) => {
     const location = user.homeDistrict || complaints[0]?.city || "Global";
     
     // Improved location matching logic
-    let rankingMatch = { status: "resolved" };
+    let rankingMatch = { status: { $in: RESOLVED_STATUSES }, ...ACTIVE_QUERY };
     if (location !== "Global") {
       const words = location.split(/[\s,]+/).filter(w => w.length > 2);
       if (words.length > 0) {
@@ -156,37 +160,39 @@ export const getAdminAnalytics = async (req, res) => {
     const { period = "This Month" } = req.query;
     
     // Calculate date filter based on period
-    let dateFilter = {};
+    let dateFilter = { ...ACTIVE_QUERY };
     const now = new Date();
     
     if (period === "This Week") {
       const weekAgo = new Date(now);
       weekAgo.setDate(weekAgo.getDate() - 7);
-      dateFilter = { createdAt: { $gte: weekAgo } };
+      dateFilter = { createdAt: { $gte: weekAgo }, ...ACTIVE_QUERY };
     } else if (period === "This Month") {
       const monthAgo = new Date(now);
       monthAgo.setMonth(monthAgo.getMonth() - 1);
-      dateFilter = { createdAt: { $gte: monthAgo } };
+      dateFilter = { createdAt: { $gte: monthAgo }, ...ACTIVE_QUERY };
     } else if (period === "Last 3 Months") {
       const threeMonthsAgo = new Date(now);
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-      dateFilter = { createdAt: { $gte: threeMonthsAgo } };
+      dateFilter = { createdAt: { $gte: threeMonthsAgo }, ...ACTIVE_QUERY };
     }
     // "All Time" means empty filter
 
     // 1. Stats based on period
     const allComplaints = await Complaint.find(dateFilter);
     const totalComplaints = allComplaints.length;
-    const resolvedCount = allComplaints.filter(c => c.status.toLowerCase() === "resolved").length;
+    const resolvedCount = allComplaints.filter(c => RESOLVED_STATUSES.includes(c.status)).length;
     const activeCount = allComplaints.filter(c => c.status.toLowerCase() === "in_progress").length;
     const newCount = allComplaints.filter(c => c.status.toLowerCase() === "new").length;
 
-    // 2. Resolution Rate & Avg Time
-    const resolvedComplaints = allComplaints.filter(c => c.status.toLowerCase() === "resolved" && c.updatedAt);
+    // 2. Resolution Rate & Avg Time — measure against the recorded
+    // resolution timestamp, not updatedAt (which moves on every save)
+    const resolveTime = (c) => c.timestamps?.resolved || c.timestamps?.confirmedResolved || c.updatedAt;
+    const resolvedComplaints = allComplaints.filter(c => RESOLVED_STATUSES.includes(c.status) && resolveTime(c));
     let totalDays = 0;
     resolvedComplaints.forEach(c => {
       const created = new Date(c.createdAt);
-      const updated = new Date(c.updatedAt);
+      const updated = new Date(resolveTime(c));
       const diff = (updated - created) / (1000 * 60 * 60 * 24);
       totalDays += diff;
     });
@@ -200,7 +206,7 @@ export const getAdminAnalytics = async (req, res) => {
     sevenDaysAgo.setHours(0, 0, 0, 0);
 
     const weeklyIncomingData = await Complaint.aggregate([
-      { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      { $match: { ...ACTIVE_QUERY, createdAt: { $gte: sevenDaysAgo } } },
       { 
         $group: { 
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, 
@@ -211,12 +217,28 @@ export const getAdminAnalytics = async (req, res) => {
     ]);
 
     const weeklyResolvedData = await Complaint.aggregate([
-      { $match: { status: "resolved", updatedAt: { $gte: sevenDaysAgo } } },
-      { 
-        $group: { 
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$updatedAt" } }, 
-          count: { $sum: 1 } 
-        } 
+      {
+        $match: {
+          ...ACTIVE_QUERY,
+          status: { $in: RESOLVED_STATUSES },
+          $expr: {
+            $gte: [
+              { $ifNull: ["$timestamps.resolved", "$timestamps.confirmedResolved"] },
+              sevenDaysAgo
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: { $ifNull: ["$timestamps.resolved", "$timestamps.confirmedResolved"] }
+            }
+          },
+          count: { $sum: 1 }
+        }
       },
       { $sort: { _id: 1 } }
     ]);
@@ -241,12 +263,14 @@ export const getAdminAnalytics = async (req, res) => {
 
     // 4. Category Breakdown
     const categoryStats = await Complaint.aggregate([
+      { $match: { ...ACTIVE_QUERY } },
       { $group: { _id: "$category", count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
 
     // 5. District Breakdown
     const districtStats = await Complaint.aggregate([
+      { $match: { ...ACTIVE_QUERY } },
       { $group: { _id: "$city", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 }
@@ -254,6 +278,7 @@ export const getAdminAnalytics = async (req, res) => {
 
     // 6. Top Reporters
     const topReportersData = await Complaint.aggregate([
+      { $match: { ...ACTIVE_QUERY } },
       { $group: { _id: "$user", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 5 }
@@ -274,7 +299,7 @@ export const getAdminAnalytics = async (req, res) => {
 
     resolvedComplaints.forEach(c => {
       const created = new Date(c.createdAt);
-      const updated = new Date(c.updatedAt);
+      const updated = new Date(resolveTime(c));
       const days = (updated - created) / (1000 * 60 * 60 * 24);
       if (days < 1) buckets[0].count++;
       else if (days < 3) buckets[1].count++;
