@@ -14,6 +14,10 @@ export const connectDB = async () => {
       console.log("MongoDB Disconnected");
     });
 
+    if (!process.env.MONGODB_URL) {
+      throw new Error("MONGODB_URL is not set — add it to backend/.env");
+    }
+
     let mongoUrl = process.env.MONGODB_URL.trim().replace(/\/$/, '');
     // Handle Atlas URIs with query params (?appName=...) and trailing slash
     // Insert DB name before '?' if present: ...mongodb.net/?appName=X -> ...mongodb.net/problemRegPortal?appName=X
