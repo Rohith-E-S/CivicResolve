@@ -45,11 +45,9 @@ const complaintSchema = new mongoose.Schema(
     },
     beforeImageUrl: {
       type: String,
-      lowercase: true,
     },
     afterImageUrl: {
       type: String,
-      lowercase: true,
     },
     category: {
       type: String,
