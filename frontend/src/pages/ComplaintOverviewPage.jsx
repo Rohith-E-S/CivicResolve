@@ -10,6 +10,7 @@ const ComplaintOverviewPage = () => {
   const [complaint, setComplaint] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState();
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
 
@@ -30,6 +31,7 @@ const ComplaintOverviewPage = () => {
       const res = await API.get(`/complaint/get-complaint-data/${id}`);
       setComplaint(res.data.complaint);
       setIsAdmin(res.data.isAdmin);
+      setCurrentUserId(JSON.parse(localStorage.getItem("userData") || "null")?._id ?? null);
     } catch (error) {
       console.error("Error fetching complaint:", error);
     } finally {
@@ -131,7 +133,7 @@ const ComplaintOverviewPage = () => {
           </div>
 
           <aside className="space-y-6">
-            {complaint.status === "resolved" && !isAdmin && (
+            {complaint.status === "resolved" && !isAdmin && complaint.user?._id === currentUserId && (
               <article className="ui-card">
                 <h2 className="text-base font-semibold">Rate resolution</h2>
                 <div className="mt-3 flex gap-1">

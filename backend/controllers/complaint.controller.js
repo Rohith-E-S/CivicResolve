@@ -1009,6 +1009,7 @@ export const rateComplaint = async (req, res) => {
 
     const complaint = await Complaint.findOne({
       _id: complaintId,
+      user: req.user._id,
       ...ACTIVE_COMPLAINT_QUERY,
     });
 
