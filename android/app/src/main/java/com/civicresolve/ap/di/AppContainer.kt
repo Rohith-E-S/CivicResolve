@@ -5,6 +5,7 @@ import com.civicresolve.ap.data.ThemePreferences
 import com.civicresolve.ap.data.remote.ApiService
 import com.civicresolve.ap.data.remote.CookieJarImpl
 import com.civicresolve.ap.data.repository.AuthRepository
+import com.civicresolve.ap.notification.NotificationSocketManager
 import com.civicresolve.ap.data.repository.ComplaintRepository
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -23,6 +24,7 @@ interface AppContainer {
     val socketUrl: String
     val themePreferences: ThemePreferences
     val apiService: ApiService
+    val notificationSocket: NotificationSocketManager
 }
 
 class DefaultAppContainer(private val context: Context) : AppContainer {
@@ -34,6 +36,8 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         .build()
 
     override val cookieJar = CookieJarImpl(context)
+
+    override val notificationSocket = NotificationSocketManager(context, cookieJar, socketUrl)
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
