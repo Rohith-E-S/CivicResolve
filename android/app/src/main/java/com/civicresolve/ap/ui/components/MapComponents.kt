@@ -53,14 +53,21 @@ fun ComplaintMap(lat: String, lng: String, modifier: Modifier = Modifier) {
                 setMultiTouchControls(true)
                 controller.setZoom(15.0)
                 controller.setCenter(GeoPoint(latD, lngD))
-                val m = Marker(this)
-                m.position = GeoPoint(latD, lngD)
-                m.title = "Complaint Location"
-                overlays.add(m)
             }
         },
         update = { map ->
-            map.controller.setCenter(GeoPoint(latD, lngD))
+            val point = GeoPoint(latD, lngD)
+            val marker = map.overlays.filterIsInstance<Marker>().firstOrNull()
+            if (marker == null) {
+                val m = Marker(map)
+                m.position = point
+                m.title = "Complaint Location"
+                map.overlays.add(m)
+            } else {
+                marker.position = point
+            }
+            map.controller.setCenter(point)
+            map.invalidate()
         }
     )
 }
@@ -98,7 +105,12 @@ fun MapPicker(
                 }
             },
             update = { map ->
-                // keep center if external lat/lng changed
+                // Recentre when the pin is set externally (e.g. "Use current
+                // location") so the crosshair matches the submitted coords
+                val target = GeoPoint(latD, lngD)
+                if (map.mapCenter.distanceToAsDouble(target) > 1.0) {
+                    map.controller.animateTo(target)
+                }
             }
         )
         // Crosshair
@@ -155,18 +167,22 @@ fun ExploreMapSimple(
                 setMultiTouchControls(true)
                 controller.setZoom(zoom)
                 controller.setCenter(GeoPoint(avgLat, avgLng))
-                valid.forEach { c ->
-                    val m = Marker(this)
-                    m.position = GeoPoint(c.latitude.toDouble(), c.longitude.toDouble())
-                    m.title = c.description.take(40)
-                    m.setOnMarkerClickListener { _, _ -> onSelect(c); true }
-                    overlays.add(m)
-                }
             }
         },
         update = { map ->
+            // Rebuild markers on every data change (refresh, district/global
+            // toggle) — the factory block only runs once
+            map.overlays.clear()
+            valid.forEach { c ->
+                val m = Marker(map)
+                m.position = GeoPoint(c.latitude.toDouble(), c.longitude.toDouble())
+                m.title = c.description.take(40)
+                m.setOnMarkerClickListener { _, _ -> onSelect(c); true }
+                map.overlays.add(m)
+            }
             map.controller.setCenter(GeoPoint(avgLat, avgLng))
             map.controller.setZoom(zoom)
+            map.invalidate()
         }
     )
 }
