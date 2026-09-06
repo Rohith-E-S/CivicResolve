@@ -33,8 +33,10 @@ import com.civicresolve.ap.ui.theme.MonoFontFamily
 import com.civicresolve.ap.ui.viewmodel.AuthViewModel
 import com.civicresolve.ap.ui.viewmodel.DashboardViewModel
 import com.civicresolve.ap.ui.viewmodel.DashboardViewModelFactory
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -354,8 +356,10 @@ fun NewComplaintPane(
             val landmarkBody = landmark.toRequestBody("text/plain".toMediaType())
             var part: MultipartBody.Part? = null
             imageUri?.let { uri ->
-                val input = context.contentResolver.openInputStream(uri) ?: return@let
-                val bytes = input.readBytes()
+                // Reading a multi-MB photo on the main thread janks/ANRs
+                val bytes = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                } ?: return@let
                 val req = bytes.toRequestBody("image/*".toMediaType())
                 part = MultipartBody.Part.createFormData("imageUrl", "image.jpg", req)
             }
@@ -549,7 +553,10 @@ fun ProfilePane(appContainer: AppContainer, authViewModel: AuthViewModel) {
                         val addressBody = address.toRequestBody("text/plain".toMediaType())
                         var part: MultipartBody.Part? = null
                         imageUri?.let { uri ->
-                            val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
+                            // Reading a multi-MB photo on the main thread janks/ANRs
+                            val bytes = withContext(Dispatchers.IO) {
+                                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                            }
                             if (bytes != null) {
                                 val req = bytes.toRequestBody("image/*".toMediaType())
                                 part = MultipartBody.Part.createFormData("profilePic", "profile.jpg", req)
