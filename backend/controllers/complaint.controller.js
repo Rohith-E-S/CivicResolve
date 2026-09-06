@@ -1196,7 +1196,8 @@ export const getMyPaginatedComplaints = async (req, res) => {
     const complaints = await Complaint.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .populate("user", "fullName email profilePic isAdmin homeDistrict civicPoints rank");
 
     res.status(200).json({
       success: true,
@@ -1295,7 +1296,8 @@ export const getMyComplaintsWithMessages = async (req, res) => {
     const complaints = await Complaint.find(query)
       .sort({ updatedAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .populate("user", "fullName email profilePic isAdmin homeDistrict civicPoints rank");
 
     res.status(200).json({
       success: true,
