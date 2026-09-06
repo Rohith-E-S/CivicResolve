@@ -43,7 +43,7 @@ const UserChats = ({ setActiveTab }) => {
         >
           <option value="all">All status</option>
           <option value="new">New</option>
-          <option value="in progress">In progress</option>
+          <option value="in_progress">In progress</option>
           <option value="resolved">Resolved</option>
         </select>
       </div>

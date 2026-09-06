@@ -42,7 +42,7 @@ const MyComplaints = ({ setActiveTab }) => {
           <select value={filter} onChange={handleFilterChange} className="ui-select sm:w-56 !min-h-[2.4rem]">
             <option value="all">All statutes</option>
             <option value="new">New • red dot</option>
-            <option value="in progress">In progress • amber</option>
+            <option value="in_progress">In progress • amber</option>
             <option value="resolved">Resolved • green</option>
           </select>
           <Link to="/explore" className="ui-btn ui-btn-secondary hidden sm:inline-flex">

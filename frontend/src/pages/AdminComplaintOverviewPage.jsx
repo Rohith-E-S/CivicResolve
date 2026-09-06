@@ -100,8 +100,10 @@ const AdminComplaintOverviewPage = () => {
                 disabled={updating}
               >
                 <option value="new">New</option>
-                <option value="in progress">In progress</option>
+                <option value="under_review">Under review</option>
+                <option value="in_progress">In progress</option>
                 <option value="resolved">Resolved</option>
+                <option value="re_opened">Re-opened</option>
               </select>
 
               <label className="ui-btn ui-btn-primary cursor-pointer">
