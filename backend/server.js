@@ -62,18 +62,38 @@ io.use(socketAuth);
 io.on("connection", (socket) => {
   console.log("User connected:", socket.user.fullName, "ID:", socket.id);
 
-  // Join user's personal notification room so targeted emits work
-  socket.on("join_room", (userId) => {
-    if (!userId) return;
-    const room = userId.toString();
+  // Join the authenticated user's personal notification room so targeted
+  // emits work. The room is always derived from the socket identity —
+  // clients cannot subscribe to other users' notification rooms.
+  socket.on("join_room", () => {
+    const room = socket.user._id.toString();
     socket.join(room);
     console.log(`[Socket] ${socket.user.fullName} joined notification room: ${room}`);
   });
 
-  // Join complaint room
-  socket.on("joinComplaint", (complaintId) => {
-    socket.join(complaintId);
-    console.log(`${socket.user.fullName} joined room: ${complaintId}`);
+  // Join complaint room — only the complaint owner or an admin may listen in
+  socket.on("joinComplaint", async (complaintId) => {
+    try {
+      const complaint = await Complaint.findOne({
+        _id: complaintId,
+        isDeleted: { $ne: true },
+      }).select("user");
+
+      if (!complaint) {
+        socket.emit("error", { message: "Complaint not found" });
+        return;
+      }
+
+      if (!socket.user.isAdmin && complaint.user.toString() !== socket.user._id.toString()) {
+        socket.emit("error", { message: "Not allowed to join this complaint room" });
+        return;
+      }
+
+      socket.join(complaintId);
+      console.log(`${socket.user.fullName} joined room: ${complaintId}`);
+    } catch (error) {
+      console.log("Error joining complaint room:", error.message);
+    }
   });
 
   // Handle sending messages
