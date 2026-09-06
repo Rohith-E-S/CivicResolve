@@ -105,7 +105,8 @@ data class IssueCategory(
 data class ComplaintListResponse(
     val success: Boolean,
     val message: String?,
-    val complaints: List<Complaint>?
+    val complaints: List<Complaint>?,
+    val pagination: Pagination? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -127,10 +128,12 @@ data class AllComplaintsResponse(
 
 @JsonClass(generateAdapter = true)
 data class Pagination(
-    val total: Int,
-    val totalPages: Int,
-    val currentPage: Int,
-    val limit: Int
+    // Nullable because not every endpoint includes every field
+    // (e.g. the public feed omits limit)
+    val total: Int? = null,
+    val totalPages: Int? = null,
+    val currentPage: Int? = null,
+    val limit: Int? = null
 )
 
 @JsonClass(generateAdapter = true)

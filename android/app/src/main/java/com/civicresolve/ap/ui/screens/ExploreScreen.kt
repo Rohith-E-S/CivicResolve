@@ -91,8 +91,11 @@ fun ExploreScreen(
             val r = appContainer.complaintRepository.getPublicFeed(districtParam.ifBlank { "all" }, p, 20)
             r.onSuccess { res ->
                 if (res.success) {
-                    complaints = res.complaints ?: emptyList()
+                    // Page 1 replaces, later pages append so the feed grows
+                    val incoming = res.complaints ?: emptyList()
+                    complaints = if (p > 1) complaints + incoming else incoming
                     page = p
+                    totalPages = res.pagination?.totalPages ?: 1
                 }
                 loading = false
             }.onFailure { loading = false }
