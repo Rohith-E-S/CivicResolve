@@ -58,6 +58,7 @@ export const analyzeImage = async (req, res) => {
     let severity = "moderate";
     let emoji = "📦";
 
+    let uploadFailed = false;
     try {
       const upload = await cloudinary.uploader.upload(req.file.path, {
         categorization: "google_tagging",
@@ -98,10 +99,14 @@ export const analyzeImage = async (req, res) => {
         severity = "urgent";
         emoji = "🚦";
       }
-      fs.unlinkSync(req.file.path);
     } catch (error) {
-
       console.log(error);
+      uploadFailed = true;
+    } finally {
+      // Always clean up the temp file, success or failure
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {}
     }
 
     res.status(200).json({
