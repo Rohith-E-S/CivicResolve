@@ -90,6 +90,10 @@ export const verifyOtp = async (req, res) => {
     if (record.otp !== otp)
       return res.status(400).json({ success: false, message: "Wrong OTP" });
 
+    // Consume the OTP: a verified code must not remain valid for reuse or
+    // brute-forcing within its TTL window
+    await OTP.deleteOne({ _id: record._id });
+
     return res.json({ success: true, message: "OTP verified" });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
