@@ -24,9 +24,9 @@ const AllComplaints = () => {
   const fetchComplaints = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await API.get(
-        `/complaint/admin/list?page=${page}&limit=10&status=${filter}&search=${debouncedSearch}`
-      );
+      const res = await API.get("/complaint/admin/list", {
+        params: { page, limit: 10, status: filter, search: debouncedSearch },
+      });
       if (res.data.success) {
         setComplaints(res.data.complaints);
         setTotalPages(res.data.pagination.totalPages);
