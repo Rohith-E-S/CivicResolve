@@ -108,7 +108,14 @@ fun MapPicker(
                 // Recentre when the pin is set externally (e.g. "Use current
                 // location") so the crosshair matches the submitted coords
                 val target = GeoPoint(latD, lngD)
-                if (map.mapCenter.distanceToAsDouble(target) > 1.0) {
+                val center = map.mapCenter
+                val rad = Math.PI / 180.0
+                val dLat = (target.latitude - center.latitude) * rad
+                val dLng = (target.longitude - center.longitude) * rad
+                val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(center.latitude * rad) * Math.cos(target.latitude * rad) *
+                    Math.sin(dLng / 2) * Math.sin(dLng / 2)
+                if (6371000.0 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) > 1.0) {
                     map.controller.animateTo(target)
                 }
             }
