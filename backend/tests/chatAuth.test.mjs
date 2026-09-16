@@ -33,8 +33,8 @@ test("missing user or complaint is denied", () => {
 });
 
 test("ObjectId-like wrappers compare by string value", () => {
-  const oidOwner = { _id: { toString: () => "aaaaaaaaaaaaaaaaaaaaaaaa" } };
-  const oidComplaint = { user: { toString: () => "aaaaaaaaaaaaaaaaaaaaaaaa" } };
+  const oidOwner = { _id: { toHexString: () => "aaaaaaaaaaaaaaaaaaaaaaaa" } };
+  const oidComplaint = { user: { toHexString: () => "aaaaaaaaaaaaaaaaaaaaaaaa" } };
   assert.equal(canAccessComplaintChat(oidOwner, oidComplaint), true);
 });
 
@@ -47,4 +47,13 @@ test("normalizeChatMessage rejects empty, non-string, and oversized input", () =
   assert.ok(normalizeChatMessage(42).error);
   assert.ok(normalizeChatMessage("x".repeat(MAX_CHAT_MESSAGE_LENGTH + 1)).error);
   assert.ok(!normalizeChatMessage("x".repeat(MAX_CHAT_MESSAGE_LENGTH)).error);
+});
+
+test("missing and malformed identities never match by accident", () => {
+  for (const id of [undefined, null, "", "bad-id", {}, 42]) {
+    assert.equal(canAccessComplaintChat({ _id: id }, { user: id }), false);
+    assert.equal(canAccessComplaintChat({ _id: id, isAdmin: true }, complaint), false);
+  }
+  assert.equal(canAccessComplaintChat({ ...otherUser, isAdmin: "true" }, complaint), false);
+  assert.equal(canAccessComplaintChat(owner, { user: { _id: owner._id } }), true);
 });

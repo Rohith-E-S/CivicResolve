@@ -12,8 +12,9 @@ import notificationRouter from "./routes/notification.route.js";
 import { socketAuth } from "./middleware/socket.auth.js";
 import Message from "./models/message.model.js";
 import Complaint from "./models/complaint.model.js";
+import User from "./models/user.model.js";
 import { notifyAdminComment, notifyAdminNewMessage } from "./services/notificationService.js";
-import { canAccessComplaintChat, normalizeChatMessage } from "./utils/chatAuth.js";
+import { canAccessComplaintChat, normalizeChatMessage, isChatId, toChatId } from "./utils/chatAuth.js";
 
 dotenv.config();
 
@@ -74,6 +75,11 @@ io.on("connection", (socket) => {
 
   // Join complaint room — only the complaint owner or an admin may listen in
   socket.on("joinComplaint", async (complaintId) => {
+    if (!isChatId(complaintId)) {
+      socket.emit("error", { message: "Invalid complaint ID" });
+      return;
+    }
+    complaintId = complaintId.toLowerCase();
     try {
       const complaint = await Complaint.findOne({
         _id: complaintId,
@@ -94,8 +100,13 @@ io.on("connection", (socket) => {
 
   // Handle sending messages
   socket.on("sendMessage", async (data) => {
+    if (!data || Array.isArray(data) || !isChatId(data.complaintId)) {
+      socket.emit("error", { message: "Invalid complaint ID" });
+      return;
+    }
     try {
-      const { complaintId, message: rawMessage } = data;
+      const complaintId = data.complaintId.toLowerCase();
+      const rawMessage = data.message;
 
       const complaint = await Complaint.findById(complaintId);
       if (!canAccessComplaintChat(socket.user, complaint)) {
@@ -119,7 +130,6 @@ io.on("connection", (socket) => {
         recipientId = complaint.user;
       } else {
         // User -> Admin: pick a district admin for this complaint's city
-        const User = (await import("./models/user.model.js")).default;
         const allAdmins = await User.find({ isAdmin: true }).select("_id homeDistrict");
         const city = (complaint.city || "").toLowerCase();
 
@@ -142,8 +152,8 @@ io.on("connection", (socket) => {
         recipientId = (districtAdmins[0] || allAdmins[0])?._id;
       }
 
-      // Last resort (no admins registered): keep the client-supplied value
-      const toUser = recipientId || data.toUser;
+      // Fail closed if no server-selected recipient exists. Never trust data.toUser.
+      const toUser = toChatId(recipientId);
       if (!toUser) {
         socket.emit("error", { message: "No recipient available for this message" });
         return;
@@ -159,8 +169,8 @@ io.on("connection", (socket) => {
 
       // Populate user info for response
       const populatedMessage = await Message.findById(newMessage._id)
-        .populate("fromUser", "fullName email isAdmin")
-        .populate("toUser", "fullName email isAdmin");
+        .populate("fromUser", "fullName profilePic isAdmin")
+        .populate("toUser", "fullName profilePic isAdmin");
 
       // Broadcast to room
       io.to(complaintId).emit("newMessage", populatedMessage);
@@ -176,7 +186,6 @@ io.on("connection", (socket) => {
           category: complaint.category
         });
       } else {
-        const User = (await import("./models/user.model.js")).default;
         const allAdmins = await User.find({ isAdmin: true }).select("_id homeDistrict fullName");
         const city = (complaint.city || "").toLowerCase();
 
@@ -218,8 +227,12 @@ io.on("connection", (socket) => {
 
   // Handle marking messages as seen
   socket.on("markSeen", async (data) => {
+    if (!data || Array.isArray(data) || !isChatId(data.complaintId)) {
+      socket.emit("error", { message: "Invalid complaint ID" });
+      return;
+    }
     try {
-      const { complaintId } = data;
+      const complaintId = data.complaintId.toLowerCase();
 
       // Authorization before any write: only the owner or an admin may
       // interact with this complaint's chat, same rule as sendMessage
