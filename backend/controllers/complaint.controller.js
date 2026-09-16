@@ -228,7 +228,7 @@ export const createComplaint = async (req, res) => {
 
 
     // Populate user before sending to Android to avoid parsing errors
-    const populatedComplaint = await Complaint.findById(newComplaint._id).populate("user");
+    const populatedComplaint = await Complaint.findById(newComplaint._id).populate("user", PUBLIC_USER_FIELDS);
 
     res.status(201).json({
       success: true,
@@ -302,7 +302,7 @@ export const getMyComplaint = async (req, res) => {
     const complaints = await Complaint.find({
       user: req.user._id,
       ...ACTIVE_COMPLAINT_QUERY,
-    }).populate("user");
+    }).populate("user", PUBLIC_USER_FIELDS);
     if (!complaints) {
       return res
         .status(404)
@@ -333,7 +333,7 @@ export const getAllComplaints = async (req, res) => {
     }
 
     const complaints = await Complaint.find(ACTIVE_COMPLAINT_QUERY).populate(
-      "user"
+      "user", PUBLIC_USER_FIELDS
     );
 
     if (!complaints) {
@@ -408,7 +408,7 @@ export const getAllComplaints = async (req, res) => {
 //     let complaints;
 
 //     if (state) {
-//       complaints = await Complaint.find({ state }).populate("user");
+//       complaints = await Complaint.find({ state }).populate("user", PUBLIC_USER_FIELDS);
 
 //       if (!complaints || complaints.length === 0) {
 //         return res
@@ -416,7 +416,7 @@ export const getAllComplaints = async (req, res) => {
 //           .json({ success: false, message: "No complaints within this state" });
 //       }
 //     } else {
-//       complaints = await Complaint.find({ city }).populate("user");
+//       complaints = await Complaint.find({ city }).populate("user", PUBLIC_USER_FIELDS);
 
 //       if (!complaints || complaints.length === 0) {
 //         return res
@@ -472,7 +472,7 @@ export const filterComplaintOnStateCity = async (req, res) => {
 
     const query = { [fetchField]: fetchValue, ...ACTIVE_COMPLAINT_QUERY };
 
-    const complaints = await Complaint.find(query).populate("user");
+    const complaints = await Complaint.find(query).populate("user", PUBLIC_USER_FIELDS);
 
     if (!complaints.length) {
       return res.status(404).json({
@@ -562,7 +562,7 @@ export const updateComplaintStatus = async (req, res) => {
     }
 
     // Return populated complaint so Android gets user object
-    const populatedComplaint = await Complaint.findById(complaintId).populate("user");
+    const populatedComplaint = await Complaint.findById(complaintId).populate("user", PUBLIC_USER_FIELDS);
 
     // Socket broadcasting logic
     const io = req.app.get("io");
@@ -706,7 +706,7 @@ export const updateAfterImageUrl = async (req, res) => {
     complaint.timestamps.pendingVerification = new Date();
 
     await complaint.save();
-    const populatedComplaint = await Complaint.findById(complaint._id).populate("user");
+    const populatedComplaint = await Complaint.findById(complaint._id).populate("user", PUBLIC_USER_FIELDS);
 
     // Socket broadcasting
     const io = req.app.get("io");
@@ -801,7 +801,7 @@ export const updateComplaint = async (req, res) => {
     const complaint = await Complaint.findOne({
       _id: complaintId,
       ...ACTIVE_COMPLAINT_QUERY,
-    }).populate("user");
+    }).populate("user", "fullName email");
 
     if (!complaint) {
       return res.status(404).json({
@@ -965,7 +965,7 @@ export const updateComplaint = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Complaint updated successfully",
-      complaint,
+      complaint: await Complaint.findById(complaintId).populate("user", PUBLIC_USER_FIELDS),
     });
   } catch (error) {
     return res.status(500).json({
@@ -1041,7 +1041,7 @@ export const rateComplaint = async (req, res) => {
 
     complaint.rating = rating;
     await complaint.save();
-    const populatedComplaint = await Complaint.findById(complaint._id).populate("user");
+    const populatedComplaint = await Complaint.findById(complaint._id).populate("user", PUBLIC_USER_FIELDS);
 
     res.status(200).json({
       success: true,
@@ -1068,7 +1068,7 @@ export const getComplaintStats = async (req, res) => {
       });
     }
 
-    const complaints = await Complaint.find(ACTIVE_COMPLAINT_QUERY);
+    const complaints = await Complaint.find(ACTIVE_COMPLAINT_QUERY).populate("user", PUBLIC_USER_FIELDS);
 
     const newComplaint = complaints.filter((c) => c.status === "new");
     const inProgressComplaint = complaints.filter(
@@ -1143,7 +1143,7 @@ export const getPaginatedComplaints = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("user");
+      .populate("user", PUBLIC_USER_FIELDS);
 
     res.status(200).json({
       success: true,
@@ -1212,7 +1212,7 @@ export const getMyPaginatedComplaints = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("user", "fullName email profilePic isAdmin homeDistrict civicPoints rank");
+      .populate("user", PUBLIC_USER_FIELDS);
 
     res.status(200).json({
       success: true,
@@ -1262,7 +1262,7 @@ export const getComplaintsWithMessages = async (req, res) => {
       .sort({ updatedAt: -1 }) // Sort by recently updated
       .skip(skip)
       .limit(limit)
-      .populate("user");
+      .populate("user", PUBLIC_USER_FIELDS);
 
     res.status(200).json({
       success: true,
@@ -1312,7 +1312,7 @@ export const getMyComplaintsWithMessages = async (req, res) => {
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("user", "fullName email profilePic isAdmin homeDistrict civicPoints rank");
+      .populate("user", PUBLIC_USER_FIELDS);
 
     res.status(200).json({
       success: true,
@@ -1828,7 +1828,7 @@ export const verifyComplaint = async (req, res) => {
     res.status(200).json({
       success: true,
       message: complaint.status === "resolved" ? "Complaint fully resolved!" : "Verification recorded",
-      complaint: await Complaint.findById(id).populate("user")
+      complaint: await Complaint.findById(id).populate("user", PUBLIC_USER_FIELDS)
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -1931,7 +1931,7 @@ export const disputeComplaint = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Dispute submitted successfully",
-      complaint: await Complaint.findById(id).populate("user")
+      complaint: await Complaint.findById(id).populate("user", PUBLIC_USER_FIELDS)
     });
   } catch (error) {
     console.error("[Dispute] CRITICAL ERROR:", error);
@@ -2000,7 +2000,7 @@ export const resolveDispute = async (req, res) => {
     res.status(200).json({
       success: true,
       message: `Dispute ${action === "reopen" ? "re-opened" : "confirmed resolved"}`,
-      complaint: await Complaint.findById(id).populate("user")
+      complaint: await Complaint.findById(id).populate("user", PUBLIC_USER_FIELDS)
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
