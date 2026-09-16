@@ -2,6 +2,15 @@ import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
+// Query projections do not protect newly created or explicitly selected documents.
+// Strip authentication material at both response serialization boundaries.
+const removePrivateAuthFields = (_document, result) => {
+  for (const field of ["password", "otp", "resetPasswordToken", "resetPasswordExpires", "fcmToken", "sessionVersion"]) {
+    delete result[field];
+  }
+  return result;
+};
+
 const userSchema = new mongoose.Schema(
   {
     email: {
@@ -107,7 +116,11 @@ const userSchema = new mongoose.Schema(
       default: "citizen",
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { transform: removePrivateAuthFields },
+    toObject: { transform: removePrivateAuthFields },
+  }
 );
 
 userSchema.index({ lastLocation: "2dsphere" }, { partialFilterExpression: { "lastLocation.coordinates": { $exists: true } } });
