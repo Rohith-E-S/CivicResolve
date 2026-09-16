@@ -29,6 +29,8 @@ import {
 import { awardPoints } from "../services/pointsService.js";
 
 const ACTIVE_COMPLAINT_QUERY = { isDeleted: { $ne: true } };
+// Complaint readers need identity/display fields, not private contact or GPS data.
+const PUBLIC_USER_FIELDS = "fullName profilePic isAdmin civicPoints rank";
 const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const toRadians = (degree) => (degree * Math.PI) / 180;
 
@@ -981,7 +983,7 @@ export const getComplaint = async (req, res) => {
     const complaint = await Complaint.findOne({
       _id: complaintId,
       ...ACTIVE_COMPLAINT_QUERY,
-    }).populate("user");
+    }).populate("user", PUBLIC_USER_FIELDS);
 
     if (!complaint) {
       return res
