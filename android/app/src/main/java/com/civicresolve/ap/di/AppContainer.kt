@@ -10,6 +10,7 @@ import com.civicresolve.ap.data.repository.ComplaintRepository
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.OkHttpClient
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -35,7 +36,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         .add(KotlinJsonAdapterFactory())
         .build()
 
-    override val cookieJar = CookieJarImpl(context)
+    override val cookieJar = CookieJarImpl(context, baseUrl.toHttpUrl())
 
     override val notificationSocket = NotificationSocketManager(context, cookieJar, socketUrl)
 

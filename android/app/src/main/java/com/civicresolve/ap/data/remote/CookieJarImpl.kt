@@ -1,19 +1,18 @@
 package com.civicresolve.ap.data.remote
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
 
-class CookieJarImpl(context: Context) : CookieJar {
+class CookieJarImpl(context: Context, backendUrl: HttpUrl) : CookieJar {
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
 
-    private val sharedPreferences: SharedPreferences = EncryptedSharedPreferences.create(
+    private val preferences = EncryptedSharedPreferences.create(
         context,
         "SecureCookiePrefs",
         masterKey,
@@ -21,39 +20,21 @@ class CookieJarImpl(context: Context) : CookieJar {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        val editor = sharedPreferences.edit()
-        cookies.forEach { cookie ->
-            if (cookie.name == "token") {
-                editor.putString(cookie.name, cookie.value)
-            }
+    init {
+        // Legacy bare tokens have no trustworthy origin or expiry: require sign-in.
+        preferences.edit().remove("token").apply()
+    }
+
+    private val delegate = PersistentCookieJar(object : CookieStorage {
+        override fun read(): Set<String> = preferences.getStringSet("cookies_v2", emptySet())!!.toSet()
+        override fun write(cookies: Set<String>) {
+            preferences.edit().putStringSet("cookies_v2", cookies).apply()
         }
-        editor.apply()
-    }
+    }, backendUrl)
 
-    fun setToken(token: String) {
-        sharedPreferences.edit().putString("token", token).apply()
-    }
-
-    override fun loadForRequest(url: HttpUrl): List<Cookie> {
-        val cookies = mutableListOf<Cookie>()
-        val token = sharedPreferences.getString("token", null)
-        if (token != null) {
-            val cookie = Cookie.Builder()
-                .name("token")
-                .value(token)
-                .domain(url.host)
-                .build()
-            cookies.add(cookie)
-        }
-        return cookies
-    }
-
-    fun clearCookies() {
-        sharedPreferences.edit().clear().apply()
-    }
-
-    fun getToken(): String? {
-        return sharedPreferences.getString("token", null)
-    }
+    override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) = delegate.saveFromResponse(url, cookies)
+    override fun loadForRequest(url: HttpUrl): List<Cookie> = delegate.loadForRequest(url)
+    fun setToken(token: String) = delegate.setToken(token)
+    fun getToken(): String? = delegate.getToken()
+    fun clearCookies() = delegate.clearCookies()
 }
