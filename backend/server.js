@@ -13,6 +13,7 @@ import { socketAuth } from "./middleware/socket.auth.js";
 import Message from "./models/message.model.js";
 import Complaint from "./models/complaint.model.js";
 import { notifyAdminComment, notifyAdminNewMessage } from "./services/notificationService.js";
+import { canAccessComplaintChat, normalizeChatMessage } from "./utils/chatAuth.js";
 
 dotenv.config();
 
@@ -77,14 +78,9 @@ io.on("connection", (socket) => {
       const complaint = await Complaint.findOne({
         _id: complaintId,
         isDeleted: { $ne: true },
-      }).select("user");
+      }).select("user isDeleted");
 
-      if (!complaint) {
-        socket.emit("error", { message: "Complaint not found" });
-        return;
-      }
-
-      if (!socket.user.isAdmin && complaint.user.toString() !== socket.user._id.toString()) {
+      if (!canAccessComplaintChat(socket.user, complaint)) {
         socket.emit("error", { message: "Not allowed to join this complaint room" });
         return;
       }
@@ -99,13 +95,20 @@ io.on("connection", (socket) => {
   // Handle sending messages
   socket.on("sendMessage", async (data) => {
     try {
-      const { complaintId, message } = data;
+      const { complaintId, message: rawMessage } = data;
 
       const complaint = await Complaint.findById(complaintId);
-      if (!complaint) {
-        socket.emit("error", { message: "Complaint not found" });
+      if (!canAccessComplaintChat(socket.user, complaint)) {
+        socket.emit("error", { message: "Complaint not found or not allowed" });
         return;
       }
+
+      const normalized = normalizeChatMessage(rawMessage);
+      if (normalized.error) {
+        socket.emit("error", { message: normalized.error });
+        return;
+      }
+      const message = normalized.message;
 
       // Resolve the recipient server-side. Clients used to send toUser
       // themselves, and citizens ended up addressing their own messages to
@@ -217,6 +220,14 @@ io.on("connection", (socket) => {
   socket.on("markSeen", async (data) => {
     try {
       const { complaintId } = data;
+
+      // Authorization before any write: only the owner or an admin may
+      // interact with this complaint's chat, same rule as sendMessage
+      const complaint = await Complaint.findById(complaintId).select("user isDeleted");
+      if (!canAccessComplaintChat(socket.user, complaint)) {
+        socket.emit("error", { message: "Complaint not found or not allowed" });
+        return;
+      }
 
       // Mark all messages sent TO current user as seen
       await Message.updateMany(
