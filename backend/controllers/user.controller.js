@@ -262,12 +262,18 @@ export const checkAuth = (req, res) => {
 // signature and expiry server-side). Returns the token claims or null.
 async function verifyGoogleIdToken(credential) {
   try {
+    if (!process.env.GOOGLE_CLIENT_ID || typeof credential !== "string" || !credential.trim()) return null;
     const response = await fetch(
-      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+      { signal: AbortSignal.timeout(5000) }
     );
     if (!response.ok) return null;
     const info = await response.json();
-    if (info.aud && process.env.GOOGLE_CLIENT_ID && info.aud !== process.env.GOOGLE_CLIENT_ID) {
+    if (info.aud !== process.env.GOOGLE_CLIENT_ID ||
+        !["accounts.google.com", "https://accounts.google.com"].includes(info.iss) ||
+        !Number.isFinite(Number(info.exp)) || Number(info.exp) <= Date.now() / 1000 ||
+        typeof info.email !== "string" || !info.email ||
+        typeof info.sub !== "string" || !info.sub) {
       return null;
     }
     if (info.email_verified !== "true" && info.email_verified !== true) return null;
@@ -279,63 +285,22 @@ async function verifyGoogleIdToken(credential) {
 
 export const googleLogin = async (req, res) => {
   try {
-    const { credential, email, fullName, profilePic, googleId } = req.body;
-
-    let verifiedEmail = null;
-    let verifiedGoogleId = null;
-    let verifiedFullName = null;
-    let verifiedProfilePic = null;
-
-    if (credential) {
-      // Preferred path: derive identity from a Google-verified ID token
-      const claims = await verifyGoogleIdToken(credential);
-      if (!claims) {
-        return res.status(401).json({
-          success: false,
-          message: "Invalid Google credential",
-        });
-      }
-      verifiedEmail = claims.email;
-      verifiedGoogleId = claims.sub;
-      verifiedFullName = claims.name;
-      verifiedProfilePic = claims.picture;
+    // Identity fields supplied by clients are never authentication evidence.
+    const claims = await verifyGoogleIdToken(req.body?.credential);
+    if (!claims) {
+      return res.status(401).json({ success: false, message: "Invalid Google credential" });
     }
 
-    if (!verifiedEmail && (!email || !googleId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid Google login data",
-      });
-    }
-
-    // Check if user exists
-    let user = await User.findOne({ email: verifiedEmail || email });
-
+    let user = await User.findOne({ email: claims.email });
     if (!user) {
-      if (!verifiedEmail) {
-        // Cannot create an account from unverified client-supplied claims
-        return res.status(401).json({
-          success: false,
-          message: "Google account verification required",
-        });
-      }
       user = await User.create({
-        email: verifiedEmail,
-        fullName: verifiedFullName || verifiedEmail,
-        googleId: verifiedGoogleId,
-        profilePic: verifiedProfilePic || "",
+        email: claims.email,
+        fullName: claims.name || claims.email,
+        googleId: claims.sub,
+        profilePic: claims.picture || "",
         isGoogleUser: true,
-        isVerified: true, // Google verifies email already
+        isVerified: true,
       });
-    } else if (!verifiedEmail) {
-      // Legacy clients without a credential: only allow login when the
-      // supplied googleId matches the stored one for an existing Google user
-      if (!user.isGoogleUser || !user.googleId || user.googleId !== googleId) {
-        return res.status(401).json({
-          success: false,
-          message: "Invalid Google login data",
-        });
-      }
     }
 
     // Create a JWT token
