@@ -17,3 +17,8 @@ Security hardening for `backend` authentication and session handling. Contract c
 - `JWT_SECRET_KEY` **must** be a fresh random secret of at least 32 bytes (e.g. `openssl rand -hex 32`). Weak, default, or missing secrets now **fail closed** at signing/verification — the API will not start sessions without one.
 - `GOOGLE_CLIENT_ID` must be set to the exact OAuth client ID(s); Google logins fail closed without it. Rotate credentials and the JWT secret on any suspicion of compromise; rotation revokes all existing sessions.
 - Rate limiting is stored in MongoDB (`authratelimits` collection) — limits are shared across workers and restarts.
+- Before rollout, verify the unique OTP `(email, isForgotPassword)` and AuthGrant `(email, purpose)` indexes and TTL indexes are built successfully. Existing duplicate OTP records may block index creation: drain/invalidate pending OTPs and resolve duplicates during maintenance. No database migration was performed here.
+- Existing JWTs lack session-version claims and are intentionally rejected; users must sign in again. Legacy pending OTPs and reset links must be reissued. Coordinate deployment with Android #73 and web #75; complaint/chat changes are #72.
+- `GOOGLE_CLIENT_ID` accepts a single client ID, not a comma-separated list; match web's `VITE_GOOGLE_OAUTH_CLIENT_ID`. Use same-site HTTPS with credentialed proxy/socket forwarding.
+- Configure trusted proxies deliberately for per-IP throttling. With the default configuration, users behind a reverse proxy may share its quota; never blindly trust forwarded headers.
+- Rollback must coordinate backend and clients. Code reverts do not rotate credentials or remove database indexes. No credentials were rotated and no production services were contacted.
