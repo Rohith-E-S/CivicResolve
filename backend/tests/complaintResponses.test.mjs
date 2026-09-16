@@ -61,11 +61,12 @@ for (const name of ["createComplaint", "getMyComplaint", "getAllComplaints", "fi
   });
 }
 
-test("admin stats bucket entries populate Android user objects, not IDs", async t => {
-  const state = setup(t, "new"); const req = request(); const res = response();
-  await handlers.getComplaintStats(req, res);
-  assert.equal(res.code, 200); assert.equal(state.populates(), 1);
-  assert.deepEqual(res.body.stats.newComplaint[0].user, safeReporter);
-  assert.deepEqual(res.body.stats.inProgressComplaint, []);
-  assert.deepEqual(res.body.stats.resolvedComplaint, []);
-});
+for (const [status, bucket] of [["new", "newComplaint"], ["in_progress", "inProgressComplaint"],
+  ["resolved", "resolvedComplaint"], ["confirmed_resolved", "resolvedComplaint"]]) {
+  test(`admin stats ${status} entries populate Android user objects, not IDs`, async t => {
+    const state = setup(t, status); const req = request(); const res = response();
+    await handlers.getComplaintStats(req, res);
+    assert.equal(res.code, 200); assert.equal(state.populates(), 1);
+    assert.deepEqual(res.body.stats[bucket][0].user, safeReporter);
+  });
+}

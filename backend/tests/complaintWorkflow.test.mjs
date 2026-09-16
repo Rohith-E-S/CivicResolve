@@ -58,6 +58,11 @@ for (const [name, handler, withImage] of [
     assert.ok(s.notifications.some(n => n.type === "verification_needed" && n.userId === "neighbor"));
     assert.ok(s.queries.every(q => q._id.$ne === "owner"));
     assert.ok(!s.emails.some(e => e.subject.includes("Has Been Resolved")));
+    if (handler === updateComplaint) {
+      assert.equal(s.emails.length, 1);
+      assert.equal(s.emails[0].to, "owner@example.test");
+      assert.equal(s.emails[0].subject, "Your Complaint Is Pending Verification");
+    }
   });
 }
 for (const handler of [updateComplaint, updateComplaintStatus]) {
