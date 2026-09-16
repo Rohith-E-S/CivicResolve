@@ -1,15 +1,23 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import API from "../api/axios";
+import { onSessionEnded, saveSessionUser } from "../utils/session";
 
 const ProtectedRoute = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
 
   useEffect(() => {
+    let active = true;
+    const unsubscribe = onSessionEnded(() => {
+      active = false;
+      setIsAuthenticated(false);
+    });
     const checkAuth = async () => {
       try {
         const res = await API.get("/auth/check-auth");
+        if (!active) return;
         if (res.data.success) {
+          saveSessionUser(res.data.user);
           setIsAuthenticated(true);
         } else {
           setIsAuthenticated(false);
@@ -21,6 +29,10 @@ const ProtectedRoute = ({ children }) => {
     };
 
     checkAuth();
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   if (isAuthenticated === null) {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/axios";
+import { clearSession } from "../utils/session";
 import Sidebar from "../components/dashboard/Sidebar";
 import Overview from "../components/dashboard/Overview";
 import NewComplaint from "../components/dashboard/NewComplaint";
@@ -93,10 +94,10 @@ const Dashboard = () => {
     try {
       await API.post("/auth/logout");
     } catch {
-      // clear local session even if the server call fails
+      window.alert("Could not log out. Please retry when connected.");
+      return;
     }
-    localStorage.removeItem("userData");
-    localStorage.removeItem("token");
+    clearSession();
     navigate("/");
   };
 

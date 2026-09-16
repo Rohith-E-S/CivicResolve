@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../api/axios";
 import { GoogleLogin } from "@react-oauth/google";
-import { jwtDecode } from "jwt-decode";
+import { googleLoginPayload } from "../utils/authContracts";
+import { saveSessionUser } from "../utils/session";
 import { useTheme } from "../context/ThemeContext";
 
 const Login = () => {
@@ -25,8 +26,7 @@ const Login = () => {
     try {
       const res = await API.post("/auth/login", formData);
       if (res.data.success) {
-        localStorage.setItem("token", res.data.token);
-        localStorage.setItem("userData", JSON.stringify(res.data.user));
+        saveSessionUser(res.data.user);
         navigate(res.data.user.isAdmin ? "/admin-dashboard" : "/dashboard");
       }
     } catch (err) {
@@ -39,20 +39,13 @@ const Login = () => {
 
   const handleGoogleSuccess = async (response) => {
     try {
-      const decoded = jwtDecode(response.credential);
-      const res = await API.post("/auth/google-login", {
-        email: decoded.email,
-        fullName: decoded.name,
-        profilePic: decoded.picture,
-        googleId: decoded.sub,
-      });
+      const res = await API.post("/auth/google-login", googleLoginPayload(response));
 
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("userData", JSON.stringify(res.data.user));
+      saveSessionUser(res.data.user);
       navigate(res.data.user.isAdmin ? "/admin-dashboard" : "/dashboard");
     } catch (err) {
       console.error(err);
-      setError("Google login failed");
+      setError(err.response?.data?.message || err.message || "Google login failed");
     }
   };
 

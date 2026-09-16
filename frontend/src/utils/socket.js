@@ -1,42 +1,24 @@
 import { io } from "socket.io-client";
+import { onSessionEnded } from "./session.js";
 
-// Get token from cookies
-const getToken = () => {
-    const cookies = document.cookie.split(";");
-    for (let cookie of cookies) {
-        const [name, value] = cookie.trim().split("=");
-        if (name === "token") {
-            return value;
-        }
-    }
-    return null;
-};
-
-// Same-origin by default (matches the REST baseURL strategy); the Vite dev
-// proxy forwards /socket.io, and deployments can override via VITE_SOCKET_URL
+// Use the same origin as REST (Vite proxies /socket.io in development).
+// An override must be same-site and permitted by the server's credentialed CORS.
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 
-// Create socket instance
 const socket = io(SOCKET_URL, {
-    withCredentials: true,
-    auth: {
-        token: getToken(),
-    },
-    autoConnect: false,
+  withCredentials: true,
+  autoConnect: false,
 });
 
-// Function to connect with fresh token
-export const connectSocket = () => {
-    const token = getToken();
-    if (token) {
-        socket.auth = { token };
-        socket.connect();
-    }
+// HttpOnly cookies are sent by the browser during the handshake.
+export const connectSocket = () => socket.connect();
+export const disconnectSocket = () => {
+  socket.disconnect();
+  // Never replay queued chat messages under a later login.
+  socket.sendBuffer = [];
 };
 
-// Function to disconnect
-export const disconnectSocket = () => {
-    socket.disconnect();
-};
+const unsubscribe = onSessionEnded(disconnectSocket);
+if (import.meta.hot) import.meta.hot.dispose(unsubscribe);
 
 export default socket;

@@ -3,9 +3,7 @@ import axios from "axios";
 const API = axios.create({
   baseURL: "/api",
   withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  // Axios selects JSON for objects and lets the browser set FormData boundaries.
 });
 
 // logging...
