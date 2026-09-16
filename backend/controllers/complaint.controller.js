@@ -550,7 +550,7 @@ export const updateComplaintStatus = async (req, res) => {
     // Update status + record timestamp
     complaint.status = finalStatus;
     if (!complaint.timestamps) complaint.timestamps = {};
-    if (tsField && !complaint.timestamps[tsField]) {
+    if (tsField && (oldStatus !== finalStatus || !complaint.timestamps[tsField])) {
       complaint.timestamps[tsField] = new Date();
     }
     await complaint.save();
@@ -712,16 +712,16 @@ export const updateAfterImageUrl = async (req, res) => {
     const io = req.app.get("io");
     if (io) {
       io.emit("globalToast", {
-        message: `Outstanding! A problem in ${complaint.city} was just resolved.`,
-        type: "success"
+        message: `An issue in ${complaint.city} is pending verification!`,
+        type: "info"
       });
       io.to(complaintId).emit("statusUpdated", {
         complaintId,
-        status: "RESOLVED"
+        status: "PENDING_VERIFICATION"
       });
     }
 
-    notifyStatusChanged(io, {
+    await notifyStatusChanged(io, {
       complaintOwnerId: complaint.user,
       complaintId,
       oldStatus,
@@ -813,7 +813,7 @@ export const updateComplaint = async (req, res) => {
     // Validate status (if provided)
     const normalizedStatus = typeof status === "string" ? status.toLowerCase() : undefined;
     if (
-      status &&
+      status !== undefined &&
       !["new", "under_review", "in_progress", "resolved"].includes(normalizedStatus)
     ) {
       return res.status(400).json({
@@ -834,8 +834,8 @@ export const updateComplaint = async (req, res) => {
         // Cleanup temp file
         fs.unlinkSync(req.file.path);
 
-        // Auto-resolve if image uploaded
-        complaint.status = "resolved";
+        // An after image starts community verification, never final resolution.
+        complaint.status = "pending_verification";
       } catch (error) {
         return res.status(500).json({
           success: false,
@@ -844,19 +844,32 @@ export const updateComplaint = async (req, res) => {
       }
     }
 
-    if (!req.file && status) {
-      complaint.status = normalizedStatus;
+    if (!req.file && status !== undefined) {
+      if (normalizedStatus === "resolved" && !complaint.afterImageUrl) {
+        return res.status(400).json({ success: false, message: "Cannot resolve complaint without an after image" });
+      }
+      complaint.status = normalizedStatus === "resolved" ? "pending_verification" : normalizedStatus;
     }
 
+    const timestampMap = {
+      under_review: "underReview",
+      in_progress: "inProgress",
+      pending_verification: "pendingVerification",
+    };
+    const tsField = timestampMap[complaint.status];
+    if (!complaint.timestamps) complaint.timestamps = {};
+    if (tsField && (req.file || previousStatus !== complaint.status || !complaint.timestamps[tsField])) {
+      complaint.timestamps[tsField] = new Date();
+    }
     await complaint.save();
 
     // Socket broadcasting
     const io = req.app.get("io");
     if (io) {
-      if (complaint.status === "resolved") {
+      if (complaint.status === "pending_verification") {
         io.emit("globalToast", {
-          message: `Great news! Issues in ${complaint.city} are being fixed.`,
-          type: "success"
+          message: `An issue in ${complaint.city} is pending verification!`,
+          type: "info"
         });
       }
       io.to(complaintId).emit("statusUpdated", {
@@ -865,7 +878,7 @@ export const updateComplaint = async (req, res) => {
       });
     }
 
-    notifyStatusChanged(io, {
+    await notifyStatusChanged(io, {
       complaintOwnerId: complaint.user._id,
       complaintId,
       oldStatus: previousStatus,
@@ -873,8 +886,8 @@ export const updateComplaint = async (req, res) => {
       category: complaint.category,
     }).catch(err => console.error("Notification failed:", err.message));
 
-    // Notify nearby users if resolved or pending_verification
-    if (complaint.status === "resolved" || complaint.status === "pending_verification") {
+    // Ask nearby citizens to verify the claimed resolution.
+    if (complaint.status === "pending_verification") {
       try {
         const complaintLng = complaint.location?.coordinates?.[0];
         const complaintLat = complaint.location?.coordinates?.[1];
@@ -917,19 +930,19 @@ export const updateComplaint = async (req, res) => {
       }
     }
 
-    // Send email after resolved
-    if (complaint.status === "resolved") {
+    // Keep contact lookup internal; this email requests verification, not final closure.
+    if (complaint.status === "pending_verification" && complaint.user?.email) {
       await sendMail(
         complaint.user.email,
-        "Your Complaint Has Been Resolved ✔️",
+        "Your Complaint Is Pending Verification",
         `
     <div style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; color: #333;">
-      <h2 style="color: #2b6cb0;">Your Complaint Has Been Resolved</h2>
+      <h2 style="color: #2b6cb0;">Your Complaint Is Pending Verification</h2>
 
       <p>Hi ${complaint.user.fullName},</p>
 
       <p>
-        We are happy to inform you that your complaint has been successfully resolved.
+        An administrator has reported your issue fixed. Community verification is still required before final resolution.
       </p>
 
       <div style="background: #f3f4f6; padding: 15px; border-left: 4px solid #2b6cb0; margin: 20px 0;">
@@ -1032,7 +1045,7 @@ export const rateComplaint = async (req, res) => {
       });
     }
 
-    if (complaint.status !== "resolved") {
+    if (!["resolved", "confirmed_resolved"].includes(complaint.status)) {
       return res.status(400).json({
         success: false,
         message: "You can only rate resolved complaints",
