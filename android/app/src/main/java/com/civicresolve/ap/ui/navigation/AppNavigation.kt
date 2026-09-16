@@ -118,7 +118,6 @@ fun AppNavigation(
                                 navController.navigate(dest) { popUpTo(Screen.Login.route) { inclusive = true } }
                             }
                         },
-                        onGoogleLogin = { error = "Google login not configured on this build" },
                         onSignup = { navController.navigate(Screen.Signup.route) },
                         onForgot = { navController.navigate(Screen.ForgotPassword.route) },
                         isLoading = authState.isLoading,
@@ -133,12 +132,15 @@ fun AppNavigation(
                     onSubmit = { fullName, email, password, address ->
                         error = null
                         if (fullName.isBlank() || email.isBlank() || password.isBlank() || address.isBlank()) { error = "All fields required"; return@SignupScreen }
+                        if (!com.civicresolve.ap.data.model.PasswordPolicy.isValid(password)) {
+                            error = com.civicresolve.ap.data.model.PasswordPolicy.message
+                            return@SignupScreen
+                        }
                         authViewModel.sendOtp(email) {
                             authViewModel.pendingSignupRequest = com.civicresolve.ap.data.model.CreateAccountRequest(fullName, email, password, address)
                             navController.navigate(Screen.OtpVerify.createRoute(email))
                         }
                     },
-                    onGoogleLogin = { error = "Google login not configured" },
                     onLogin = { navController.navigate(Screen.Login.route) },
                     isLoading = authState.isLoading,
                     error = error ?: authState.error

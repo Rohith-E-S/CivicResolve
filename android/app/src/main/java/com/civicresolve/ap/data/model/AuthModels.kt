@@ -38,11 +38,19 @@ data class SendOtpRequest(val email: String)
 data class VerifyOtpRequest(val email: String, val otp: String)
 
 @JsonClass(generateAdapter = true)
+data class VerifyOtpResponse(
+    val success: Boolean,
+    val message: String?,
+    val signupToken: String?
+)
+
+@JsonClass(generateAdapter = true)
 data class CreateAccountRequest(
     val fullName: String,
     val email: String,
     val password: String,
-    val address: String
+    val address: String,
+    val signupToken: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -52,12 +60,7 @@ data class LoginRequest(
 )
 
 @JsonClass(generateAdapter = true)
-data class GoogleLoginRequest(
-    val email: String,
-    val fullName: String,
-    val profilePic: String?,
-    val googleId: String
-)
+data class GoogleLoginRequest(val credential: String)
 
 @JsonClass(generateAdapter = true)
 data class SendPasswordResetOtpRequest(val email: String)

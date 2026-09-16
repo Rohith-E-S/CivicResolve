@@ -33,7 +33,7 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
         }
     }
 
-    suspend fun verifyOtp(email: String, otp: String): Result<BaseResponse> = withContext(Dispatchers.IO) {
+    suspend fun verifyOtp(email: String, otp: String): Result<VerifyOtpResponse> = withContext(Dispatchers.IO) {
         try {
             val response = apiService.verifyOtp(VerifyOtpRequest(email, otp))
             if (response.isSuccessful && response.body() != null) {
@@ -48,6 +48,12 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
     }
 
     suspend fun createAccount(request: CreateAccountRequest): Result<AuthResponse> = withContext(Dispatchers.IO) {
+        if (!PasswordPolicy.isValid(request.password)) {
+            return@withContext Result.failure(IllegalArgumentException(PasswordPolicy.message))
+        }
+        if (request.signupToken.isNullOrBlank()) {
+            return@withContext Result.failure(IllegalArgumentException("Verify your email before creating an account."))
+        }
         try {
             val response = apiService.createAccount(request)
             if (response.isSuccessful && response.body() != null) {
@@ -121,6 +127,9 @@ class AuthRepository(private val apiService: ApiService, private val cookieJar: 
     }
 
     suspend fun resetPassword(request: ResetPasswordRequest): Result<BaseResponse> = withContext(Dispatchers.IO) {
+        if (!PasswordPolicy.isValid(request.password)) {
+            return@withContext Result.failure(IllegalArgumentException(PasswordPolicy.message))
+        }
         try {
             val response = apiService.resetPassword(request)
             if (response.isSuccessful && response.body() != null) {
