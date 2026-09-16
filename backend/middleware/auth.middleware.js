@@ -1,9 +1,9 @@
-import jwt from "jsonwebtoken";
+import { requestToken, verifySession } from "../services/authSecurity.js";
 import User from "../models/user.model.js";
 
 export const protectRoute = async (req, res, next) => {
   try {
-    const token = req.cookies.token;
+    const token = requestToken(req);
 
     if (!token) {
       return res
@@ -11,11 +11,11 @@ export const protectRoute = async (req, res, next) => {
         .json({ success: false, message: "Not authenticated" });
     }
 
-    const decodedMessage = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    const decodedMessage = verifySession(token);
 
-    const user = await User.findById(decodedMessage._id);
+    const user = await User.findById(decodedMessage._id).select("+sessionVersion");
 
-    if (!user) {
+    if (!user || (user.sessionVersion ?? 0) !== decodedMessage.sessionVersion) {
       return res
         .status(401)
         .json({ success: false, message: "User not found" });
@@ -27,7 +27,7 @@ export const protectRoute = async (req, res, next) => {
   } catch (error) {
     // An expired or tampered token throws in jwt.verify — that is an
     // authentication failure (401), not a server error
-    console.error("protectRoute Error:", error.message);
+    // Never log authentication material or provider errors.
     return res.status(401).json({
       success: false,
       message: "Session invalid or expired. Please log in again.",

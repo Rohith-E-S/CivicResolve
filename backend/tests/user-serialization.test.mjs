@@ -6,7 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import bcrypt from "bcrypt";
 
-process.env.JWT_SECRET_KEY = process.env.JWT_SECRET_KEY || "test-only-secret-not-for-production";
+process.env.JWT_SECRET_KEY = "offline-fixture-signing-key-49708d83b9334658b469";
 
 const { default: User } = await import("../models/user.model.js");
 const jwt = (await import("jsonwebtoken")).default;
@@ -17,6 +17,7 @@ const SECRET_FIELDS = [
   "resetPasswordToken",
   "resetPasswordExpires",
   "fcmToken",
+  "sessionVersion",
 ];
 
 const buildUserWithPassword = async (password) => {
@@ -28,6 +29,11 @@ const buildUserWithPassword = async (password) => {
     isVerified: true,
     rank: "citizen",
     civicPoints: 10,
+    otp: 123456,
+    resetPasswordToken: "fixture-reset-proof",
+    resetPasswordExpires: new Date(Date.now() + 60000),
+    fcmToken: "fixture-device-token",
+    sessionVersion: 4,
   });
   // Same shape login() produces after findOne({ email }).select("+password")
   user.set("password", await bcrypt.hash(password, 10));

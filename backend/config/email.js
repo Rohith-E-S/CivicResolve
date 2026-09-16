@@ -16,7 +16,8 @@ export const sendMail = async (to, subject, htmlContent) => {
       subject,
       html: htmlContent,
     });
-  } catch (error) {
-    console.log("Email send error:", error.message);
+  } catch {
+    // Callers must not report OTP delivery success when the provider fails.
+    throw new Error("Email delivery failed");
   }
 };

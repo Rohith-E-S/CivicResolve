@@ -50,9 +50,9 @@ for (const [name, change] of [
 test("verified claims select account and issue session without password serialization", async (t) => {
   configure(t);
   t.mock.method(globalThis, "fetch", async () => ({ ok: true, json: async () => claims() }));
-  t.mock.method(User, "findOne", async (filter) => {
+  t.mock.method(User, "findOne", (filter) => {
     assert.deepEqual(filter, { email: claims().email });
-    return new User({ email: claims().email, fullName: "Fixture", password: "not-a-real-hash" });
+    return { select: async () => new User({ email: claims().email, fullName: "Fixture", password: "not-a-real-hash" }) };
   });
   const res = response();
   await googleLogin({ body: { credential: "offline-fixture" } }, res);

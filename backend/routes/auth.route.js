@@ -18,16 +18,24 @@ import {
 import { protectRoute } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/uploads.js";
 
+import { authRateLimit } from "../middleware/authRateLimit.js";
+
 const authRouter = express.Router();
+// Validate rate keys as strings; each purpose shares IP and account counters.
+const sendLimit = authRateLimit("otp-send", { ipLimit: 20, accountLimit: 5 });
+const verifyLimit = authRateLimit("otp-verify", { ipLimit: 50, accountLimit: 15 });
+const loginLimit = authRateLimit("login");
+const signupLimit = authRateLimit("signup");
+const resetLimit = authRateLimit("reset");
 
 // OTP BASED SIGNUP
-authRouter.post("/send-otp", sendOtp);
-authRouter.post("/verify-otp", verifyOtp);
-authRouter.post("/create-account", createAccount);
+authRouter.post("/send-otp", sendLimit, sendOtp);
+authRouter.post("/verify-otp", verifyLimit, verifyOtp);
+authRouter.post("/create-account", signupLimit, createAccount);
 
 // LOGIN / LOGOUT
-authRouter.post("/login", login);
-authRouter.post("/logout", logout);
+authRouter.post("/login", loginLimit, login);
+authRouter.post("/logout", protectRoute, logout);
 
 // CHECK AUTH
 authRouter.get("/check-auth", protectRoute, checkAuth);
@@ -41,13 +49,13 @@ authRouter.post(
 );
 
 // GOOGLE OAUTH
-authRouter.post("/google-login", googleLogin);
+authRouter.post("/google-login", loginLimit, googleLogin);
 
-authRouter.post("/sendPasswordResetOtp", sendPasswordResetOtp);
+authRouter.post("/sendPasswordResetOtp", sendLimit, sendPasswordResetOtp);
 
-authRouter.post("/verifyPasswordResetOtp", verifyPasswordResetOtp);
+authRouter.post("/verifyPasswordResetOtp", verifyLimit, verifyPasswordResetOtp);
 
-authRouter.post("/reset-password", resetPassword);
+authRouter.post("/reset-password", resetLimit, resetPassword);
 
 authRouter.post("/update-home-district", protectRoute, updateHomeDistrict);
 
