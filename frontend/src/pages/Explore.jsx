@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import API from "../api/axios";
+import { clearSession } from "../utils/session";
 import AppHeader from "../components/AppHeader";
 import Sidebar from "../components/dashboard/Sidebar";
 import { Link, useNavigate } from "react-router-dom";
@@ -135,10 +136,10 @@ const Explore = () => {
     try {
       await API.post("/auth/logout");
     } catch {
-      // clear local session even if the server call fails
+      window.alert("Could not log out. Please retry when connected.");
+      return;
     }
-    localStorage.removeItem("userData");
-    localStorage.removeItem("token");
+    clearSession();
     navigate("/");
   };
 

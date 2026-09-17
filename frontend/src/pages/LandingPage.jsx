@@ -1,24 +1,26 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../api/axios";
+import { clearSession, onSessionEnded } from "../utils/session";
 import AppHeader from "../components/AppHeader";
 
 const LandingPage = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem("token"));
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [stats, setStats] = useState({ totalActive: 0, totalResolved: 0, scope: "Nationwide" });
   const navigate = useNavigate();
 
   useEffect(() => {
+    API.get("/auth/check-auth").then((res) => setIsLoggedIn(!!res.data.success)).catch(() => setIsLoggedIn(false));
     API.get("/complaint/public-stats?district=all")
       .then((r) => r.data?.stats && setStats(r.data.stats))
       .catch(() => {});
+    return onSessionEnded(() => setIsLoggedIn(false));
   }, []);
 
   const handleLogout = async () => {
     try {
       await API.post("/auth/logout");
-      localStorage.removeItem("token");
-      localStorage.removeItem("userData");
+      clearSession();
       setIsLoggedIn(false);
       navigate("/");
     } catch (err) {

@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import API from "../api/axios";
+import { signupPayload } from "../utils/authContracts";
+import { saveSessionUser } from "../utils/session";
 
 const OtpVerify = () => {
   const [otpValues, setOtpValues] = useState(["", "", "", "", "", ""]);
@@ -50,9 +52,8 @@ const OtpVerify = () => {
           return;
         }
 
-        const account = await API.post("/auth/create-account", pending);
-        localStorage.setItem("token", account.data.token);
-        localStorage.setItem("userData", JSON.stringify(account.data.user));
+        const account = await API.post("/auth/create-account", signupPayload(pending, email, res.data.signupToken));
+        saveSessionUser(account.data.user);
         sessionStorage.removeItem("pendingSignup");
         navigate("/dashboard");
       }

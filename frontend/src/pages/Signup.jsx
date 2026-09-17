@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../api/axios";
 import { GoogleLogin } from "@react-oauth/google";
-import { jwtDecode } from "jwt-decode";
+import { googleLoginPayload, PASSWORD_POLICY, passwordError } from "../utils/authContracts";
+import { saveSessionUser } from "../utils/session";
 import { useTheme } from "../context/ThemeContext";
 
 const Signup = () => {
@@ -23,27 +24,24 @@ const Signup = () => {
 
   const handleGoogleSuccess = async (response) => {
     try {
-      const decoded = jwtDecode(response.credential);
-      const res = await API.post("/auth/google-login", {
-        credential: response.credential,
-        email: decoded.email,
-        fullName: decoded.name,
-        profilePic: decoded.picture,
-        googleId: decoded.sub,
-      });
+      const res = await API.post("/auth/google-login", googleLoginPayload(response));
 
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("userData", JSON.stringify(res.data.user));
+      saveSessionUser(res.data.user);
       navigate(res.data.user.isAdmin ? "/admin-dashboard" : "/dashboard");
     } catch (err) {
       console.error(err);
-      setError("Google login failed");
+      setError(err.response?.data?.message || err.message || "Google login failed");
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    const validationError = passwordError(formData.password);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setLoading(true);
 
     try {
@@ -112,11 +110,15 @@ const Signup = () => {
                 id="password"
                 name="password"
                 type="password"
+                minLength={8}
+                autoComplete="new-password"
+                aria-describedby="password-policy"
                 className="ui-input"
                 value={formData.password}
                 onChange={handleChange}
                 required
               />
+              <p id="password-policy" className="mt-2 text-sm text-[color:var(--ui-text-muted)]">{PASSWORD_POLICY}</p>
             </div>
 
             <div>
