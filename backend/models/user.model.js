@@ -1,6 +1,15 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+import { signSession, validPassword } from "../services/authSecurity.js";
+
+// Query projections do not protect newly created or explicitly selected documents.
+// Strip authentication material at both response serialization boundaries.
+const removePrivateAuthFields = (_document, result) => {
+  for (const field of ["password", "otp", "resetPasswordToken", "resetPasswordExpires", "fcmToken", "sessionVersion"]) {
+    delete result[field];
+  }
+  return result;
+};
 
 const userSchema = new mongoose.Schema(
   {
@@ -17,9 +26,10 @@ const userSchema = new mongoose.Schema(
 
     password: {
       type: String,
-      minLength: 6,
       select: false,
     },
+
+    sessionVersion: { type: Number, default: 0, select: false },
 
     googleId: {
       type: String,
@@ -107,19 +117,21 @@ const userSchema = new mongoose.Schema(
       default: "citizen",
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { transform: removePrivateAuthFields },
+    toObject: { transform: removePrivateAuthFields },
+  }
 );
 
 userSchema.index({ lastLocation: "2dsphere" }, { partialFilterExpression: { "lastLocation.coordinates": { $exists: true } } });
 
 userSchema.methods.getJWT = function () {
-  return jwt.sign({ _id: this.id }, process.env.JWT_SECRET_KEY, {
-    expiresIn: "1d",
-  });
+  return signSession(this);
 };
 
 userSchema.methods.checkPassword = async function (passwordInputByUser) {
-  if (!this.password) return false;
+  if (!this.password || !validPassword(passwordInputByUser, 1)) return false;
 
   return await bcrypt.compare(passwordInputByUser, this.password);
 };
