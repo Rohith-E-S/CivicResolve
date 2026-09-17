@@ -20,7 +20,6 @@ import com.civicresolve.ap.ui.theme.MonoFontFamily
 @Composable
 fun LoginScreen(
     onLogin: (String, String) -> Unit,
-    onGoogleLogin: () -> Unit,
     onSignup: () -> Unit,
     onForgot: () -> Unit,
     isLoading: Boolean,
@@ -52,7 +51,7 @@ fun LoginScreen(
             Spacer(Modifier.height(12.dp))
             Divider()
             Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = onGoogleLogin, modifier = Modifier.fillMaxWidth()) { Text("Continue with Google") }
+            Text("Google sign-in is unavailable in this build. Use email sign-in, or reset your password if you previously used Google.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Text("New here? ", style = MaterialTheme.typography.bodySmall)
@@ -65,7 +64,6 @@ fun LoginScreen(
 @Composable
 fun SignupScreen(
     onSubmit: (String, String, String, String) -> Unit,
-    onGoogleLogin: () -> Unit,
     onLogin: () -> Unit,
     isLoading: Boolean,
     error: String?,
@@ -91,13 +89,14 @@ fun SignupScreen(
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation(), shape = RoundedCornerShape(10.dp))
             Spacer(Modifier.height(8.dp))
+            Text(com.civicresolve.ap.data.model.PasswordPolicy.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedTextField(value = address, onValueChange = { address = it }, label = { Text("Address") }, modifier = Modifier.fillMaxWidth(), minLines = 3, shape = RoundedCornerShape(10.dp))
             Spacer(Modifier.height(12.dp))
             Button(onClick = { onSubmit(fullName, email, password, address) }, enabled = !isLoading, modifier = Modifier.fillMaxWidth()) { Text(if (isLoading) "Sending OTP..." else "Continue with email") }
             Spacer(Modifier.height(12.dp))
             Divider()
             Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = onGoogleLogin, modifier = Modifier.fillMaxWidth()) { Text("Continue with Google") }
+            Text("Google sign-in is unavailable in this build. Use email sign-in, or reset your password if you previously used Google.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Text("Already have an account? ", style = MaterialTheme.typography.bodySmall)
@@ -181,7 +180,7 @@ fun ResetPasswordScreen(
     Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.Center) {
         UiCard {
             Text("Set a new password", style = MaterialTheme.typography.displaySmall, fontFamily = DisplayFontFamily)
-            Text("Use a strong password that you can remember.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(com.civicresolve.ap.data.model.PasswordPolicy.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (!message.isNullOrBlank()) { Spacer(Modifier.height(8.dp)); Text(message, color = Color(0xFF0E9F6E), fontSize = 12.sp) }
             if (!error.isNullOrBlank()) { Spacer(Modifier.height(8.dp)); Text(error, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
             Spacer(Modifier.height(16.dp))

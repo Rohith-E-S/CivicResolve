@@ -64,12 +64,15 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
             val result = repository.verifyOtp(email, otp)
             result.onSuccess { response ->
                 _authState.value = _authState.value.copy(isLoading = false)
-                if (response.success) {
+                val pending = pendingSignupRequest
+                if (response.success && !response.signupToken.isNullOrBlank() && pending?.email == email) {
+                    pendingSignupRequest = pending.copy(signupToken = response.signupToken)
                     onSuccess()
                 } else {
                     _authState.value = _authState.value.copy(
                         isLoading = false,
-                        error = response.message ?: "Invalid OTP"
+                        error = if (response.success) "Verification could not complete. Restart signup and request a new code."
+                            else response.message ?: "Invalid OTP"
                     )
                 }
             }.onFailure { e ->
@@ -173,6 +176,7 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
             val result = repository.createAccount(request)
             result.onSuccess { response ->
                 if (response.success) {
+                    pendingSignupRequest = null
                     _authState.value = _authState.value.copy(
                         isLoading = false,
                         isAuthenticated = true,
@@ -270,6 +274,7 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     }
 
     fun logout(context: android.content.Context? = null) {
+        pendingSignupRequest = null
         val currentUserId = _authState.value.user?.id
         if (context != null && currentUserId != null) {
             val prefs = context.getSharedPreferences("dashboard_prefs", android.content.Context.MODE_PRIVATE)

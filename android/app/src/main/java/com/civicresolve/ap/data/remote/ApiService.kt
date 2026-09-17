@@ -11,7 +11,7 @@ interface ApiService {
     suspend fun sendOtp(@Body request: SendOtpRequest): Response<BaseResponse>
 
     @POST("auth/verify-otp")
-    suspend fun verifyOtp(@Body request: VerifyOtpRequest): Response<BaseResponse>
+    suspend fun verifyOtp(@Body request: VerifyOtpRequest): Response<VerifyOtpResponse>
 
     @POST("auth/create-account")
     suspend fun createAccount(@Body request: CreateAccountRequest): Response<AuthResponse>
