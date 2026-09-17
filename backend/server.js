@@ -12,7 +12,9 @@ import notificationRouter from "./routes/notification.route.js";
 import { socketAuth } from "./middleware/socket.auth.js";
 import Message from "./models/message.model.js";
 import Complaint from "./models/complaint.model.js";
+import User from "./models/user.model.js";
 import { notifyAdminComment, notifyAdminNewMessage } from "./services/notificationService.js";
+import { canAccessComplaintChat, normalizeChatMessage, isChatId, toChatId } from "./utils/chatAuth.js";
 
 dotenv.config();
 
@@ -73,18 +75,18 @@ io.on("connection", (socket) => {
 
   // Join complaint room — only the complaint owner or an admin may listen in
   socket.on("joinComplaint", async (complaintId) => {
+    if (!isChatId(complaintId)) {
+      socket.emit("error", { message: "Invalid complaint ID" });
+      return;
+    }
+    complaintId = complaintId.toLowerCase();
     try {
       const complaint = await Complaint.findOne({
         _id: complaintId,
         isDeleted: { $ne: true },
-      }).select("user");
+      }).select("user isDeleted");
 
-      if (!complaint) {
-        socket.emit("error", { message: "Complaint not found" });
-        return;
-      }
-
-      if (!socket.user.isAdmin && complaint.user.toString() !== socket.user._id.toString()) {
+      if (!canAccessComplaintChat(socket.user, complaint)) {
         socket.emit("error", { message: "Not allowed to join this complaint room" });
         return;
       }
@@ -98,14 +100,26 @@ io.on("connection", (socket) => {
 
   // Handle sending messages
   socket.on("sendMessage", async (data) => {
+    if (!data || Array.isArray(data) || !isChatId(data.complaintId)) {
+      socket.emit("error", { message: "Invalid complaint ID" });
+      return;
+    }
     try {
-      const { complaintId, message } = data;
+      const complaintId = data.complaintId.toLowerCase();
+      const rawMessage = data.message;
 
       const complaint = await Complaint.findById(complaintId);
-      if (!complaint) {
-        socket.emit("error", { message: "Complaint not found" });
+      if (!canAccessComplaintChat(socket.user, complaint)) {
+        socket.emit("error", { message: "Complaint not found or not allowed" });
         return;
       }
+
+      const normalized = normalizeChatMessage(rawMessage);
+      if (normalized.error) {
+        socket.emit("error", { message: normalized.error });
+        return;
+      }
+      const message = normalized.message;
 
       // Resolve the recipient server-side. Clients used to send toUser
       // themselves, and citizens ended up addressing their own messages to
@@ -116,7 +130,6 @@ io.on("connection", (socket) => {
         recipientId = complaint.user;
       } else {
         // User -> Admin: pick a district admin for this complaint's city
-        const User = (await import("./models/user.model.js")).default;
         const allAdmins = await User.find({ isAdmin: true }).select("_id homeDistrict");
         const city = (complaint.city || "").toLowerCase();
 
@@ -139,8 +152,8 @@ io.on("connection", (socket) => {
         recipientId = (districtAdmins[0] || allAdmins[0])?._id;
       }
 
-      // Last resort (no admins registered): keep the client-supplied value
-      const toUser = recipientId || data.toUser;
+      // Fail closed if no server-selected recipient exists. Never trust data.toUser.
+      const toUser = toChatId(recipientId);
       if (!toUser) {
         socket.emit("error", { message: "No recipient available for this message" });
         return;
@@ -156,8 +169,8 @@ io.on("connection", (socket) => {
 
       // Populate user info for response
       const populatedMessage = await Message.findById(newMessage._id)
-        .populate("fromUser", "fullName email isAdmin")
-        .populate("toUser", "fullName email isAdmin");
+        .populate("fromUser", "fullName profilePic isAdmin")
+        .populate("toUser", "fullName profilePic isAdmin");
 
       // Broadcast to room
       io.to(complaintId).emit("newMessage", populatedMessage);
@@ -173,7 +186,6 @@ io.on("connection", (socket) => {
           category: complaint.category
         });
       } else {
-        const User = (await import("./models/user.model.js")).default;
         const allAdmins = await User.find({ isAdmin: true }).select("_id homeDistrict fullName");
         const city = (complaint.city || "").toLowerCase();
 
@@ -215,8 +227,20 @@ io.on("connection", (socket) => {
 
   // Handle marking messages as seen
   socket.on("markSeen", async (data) => {
+    if (!data || Array.isArray(data) || !isChatId(data.complaintId)) {
+      socket.emit("error", { message: "Invalid complaint ID" });
+      return;
+    }
     try {
-      const { complaintId } = data;
+      const complaintId = data.complaintId.toLowerCase();
+
+      // Authorization before any write: only the owner or an admin may
+      // interact with this complaint's chat, same rule as sendMessage
+      const complaint = await Complaint.findById(complaintId).select("user isDeleted");
+      if (!canAccessComplaintChat(socket.user, complaint)) {
+        socket.emit("error", { message: "Complaint not found or not allowed" });
+        return;
+      }
 
       // Mark all messages sent TO current user as seen
       await Message.updateMany(

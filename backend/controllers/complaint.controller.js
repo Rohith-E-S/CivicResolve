@@ -29,6 +29,8 @@ import {
 import { awardPoints } from "../services/pointsService.js";
 
 const ACTIVE_COMPLAINT_QUERY = { isDeleted: { $ne: true } };
+// Complaint readers need identity/display fields, not private contact or GPS data.
+const PUBLIC_USER_FIELDS = "fullName profilePic isAdmin civicPoints rank";
 const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const toRadians = (degree) => (degree * Math.PI) / 180;
 
@@ -226,7 +228,7 @@ export const createComplaint = async (req, res) => {
 
 
     // Populate user before sending to Android to avoid parsing errors
-    const populatedComplaint = await Complaint.findById(newComplaint._id).populate("user");
+    const populatedComplaint = await Complaint.findById(newComplaint._id).populate("user", PUBLIC_USER_FIELDS);
 
     res.status(201).json({
       success: true,
@@ -300,7 +302,7 @@ export const getMyComplaint = async (req, res) => {
     const complaints = await Complaint.find({
       user: req.user._id,
       ...ACTIVE_COMPLAINT_QUERY,
-    }).populate("user");
+    }).populate("user", PUBLIC_USER_FIELDS);
     if (!complaints) {
       return res
         .status(404)
@@ -331,7 +333,7 @@ export const getAllComplaints = async (req, res) => {
     }
 
     const complaints = await Complaint.find(ACTIVE_COMPLAINT_QUERY).populate(
-      "user"
+      "user", PUBLIC_USER_FIELDS
     );
 
     if (!complaints) {
@@ -406,7 +408,7 @@ export const getAllComplaints = async (req, res) => {
 //     let complaints;
 
 //     if (state) {
-//       complaints = await Complaint.find({ state }).populate("user");
+//       complaints = await Complaint.find({ state }).populate("user", PUBLIC_USER_FIELDS);
 
 //       if (!complaints || complaints.length === 0) {
 //         return res
@@ -414,7 +416,7 @@ export const getAllComplaints = async (req, res) => {
 //           .json({ success: false, message: "No complaints within this state" });
 //       }
 //     } else {
-//       complaints = await Complaint.find({ city }).populate("user");
+//       complaints = await Complaint.find({ city }).populate("user", PUBLIC_USER_FIELDS);
 
 //       if (!complaints || complaints.length === 0) {
 //         return res
@@ -470,7 +472,7 @@ export const filterComplaintOnStateCity = async (req, res) => {
 
     const query = { [fetchField]: fetchValue, ...ACTIVE_COMPLAINT_QUERY };
 
-    const complaints = await Complaint.find(query).populate("user");
+    const complaints = await Complaint.find(query).populate("user", PUBLIC_USER_FIELDS);
 
     if (!complaints.length) {
       return res.status(404).json({
@@ -548,7 +550,7 @@ export const updateComplaintStatus = async (req, res) => {
     // Update status + record timestamp
     complaint.status = finalStatus;
     if (!complaint.timestamps) complaint.timestamps = {};
-    if (tsField && !complaint.timestamps[tsField]) {
+    if (tsField && (oldStatus !== finalStatus || !complaint.timestamps[tsField])) {
       complaint.timestamps[tsField] = new Date();
     }
     await complaint.save();
@@ -560,7 +562,7 @@ export const updateComplaintStatus = async (req, res) => {
     }
 
     // Return populated complaint so Android gets user object
-    const populatedComplaint = await Complaint.findById(complaintId).populate("user");
+    const populatedComplaint = await Complaint.findById(complaintId).populate("user", PUBLIC_USER_FIELDS);
 
     // Socket broadcasting logic
     const io = req.app.get("io");
@@ -704,22 +706,22 @@ export const updateAfterImageUrl = async (req, res) => {
     complaint.timestamps.pendingVerification = new Date();
 
     await complaint.save();
-    const populatedComplaint = await Complaint.findById(complaint._id).populate("user");
+    const populatedComplaint = await Complaint.findById(complaint._id).populate("user", PUBLIC_USER_FIELDS);
 
     // Socket broadcasting
     const io = req.app.get("io");
     if (io) {
       io.emit("globalToast", {
-        message: `Outstanding! A problem in ${complaint.city} was just resolved.`,
-        type: "success"
+        message: `An issue in ${complaint.city} is pending verification!`,
+        type: "info"
       });
       io.to(complaintId).emit("statusUpdated", {
         complaintId,
-        status: "RESOLVED"
+        status: "PENDING_VERIFICATION"
       });
     }
 
-    notifyStatusChanged(io, {
+    await notifyStatusChanged(io, {
       complaintOwnerId: complaint.user,
       complaintId,
       oldStatus,
@@ -799,7 +801,7 @@ export const updateComplaint = async (req, res) => {
     const complaint = await Complaint.findOne({
       _id: complaintId,
       ...ACTIVE_COMPLAINT_QUERY,
-    }).populate("user");
+    }).populate("user", "fullName email");
 
     if (!complaint) {
       return res.status(404).json({
@@ -811,7 +813,7 @@ export const updateComplaint = async (req, res) => {
     // Validate status (if provided)
     const normalizedStatus = typeof status === "string" ? status.toLowerCase() : undefined;
     if (
-      status &&
+      status !== undefined &&
       !["new", "under_review", "in_progress", "resolved"].includes(normalizedStatus)
     ) {
       return res.status(400).json({
@@ -832,8 +834,8 @@ export const updateComplaint = async (req, res) => {
         // Cleanup temp file
         fs.unlinkSync(req.file.path);
 
-        // Auto-resolve if image uploaded
-        complaint.status = "resolved";
+        // An after image starts community verification, never final resolution.
+        complaint.status = "pending_verification";
       } catch (error) {
         return res.status(500).json({
           success: false,
@@ -842,19 +844,32 @@ export const updateComplaint = async (req, res) => {
       }
     }
 
-    if (!req.file && status) {
-      complaint.status = normalizedStatus;
+    if (!req.file && status !== undefined) {
+      if (normalizedStatus === "resolved" && !complaint.afterImageUrl) {
+        return res.status(400).json({ success: false, message: "Cannot resolve complaint without an after image" });
+      }
+      complaint.status = normalizedStatus === "resolved" ? "pending_verification" : normalizedStatus;
     }
 
+    const timestampMap = {
+      under_review: "underReview",
+      in_progress: "inProgress",
+      pending_verification: "pendingVerification",
+    };
+    const tsField = timestampMap[complaint.status];
+    if (!complaint.timestamps) complaint.timestamps = {};
+    if (tsField && (req.file || previousStatus !== complaint.status || !complaint.timestamps[tsField])) {
+      complaint.timestamps[tsField] = new Date();
+    }
     await complaint.save();
 
     // Socket broadcasting
     const io = req.app.get("io");
     if (io) {
-      if (complaint.status === "resolved") {
+      if (complaint.status === "pending_verification") {
         io.emit("globalToast", {
-          message: `Great news! Issues in ${complaint.city} are being fixed.`,
-          type: "success"
+          message: `An issue in ${complaint.city} is pending verification!`,
+          type: "info"
         });
       }
       io.to(complaintId).emit("statusUpdated", {
@@ -863,7 +878,7 @@ export const updateComplaint = async (req, res) => {
       });
     }
 
-    notifyStatusChanged(io, {
+    await notifyStatusChanged(io, {
       complaintOwnerId: complaint.user._id,
       complaintId,
       oldStatus: previousStatus,
@@ -871,8 +886,8 @@ export const updateComplaint = async (req, res) => {
       category: complaint.category,
     }).catch(err => console.error("Notification failed:", err.message));
 
-    // Notify nearby users if resolved or pending_verification
-    if (complaint.status === "resolved" || complaint.status === "pending_verification") {
+    // Ask nearby citizens to verify the claimed resolution.
+    if (complaint.status === "pending_verification") {
       try {
         const complaintLng = complaint.location?.coordinates?.[0];
         const complaintLat = complaint.location?.coordinates?.[1];
@@ -915,19 +930,19 @@ export const updateComplaint = async (req, res) => {
       }
     }
 
-    // Send email after resolved
-    if (complaint.status === "resolved") {
+    // Keep contact lookup internal; this email requests verification, not final closure.
+    if (complaint.status === "pending_verification" && complaint.user?.email) {
       await sendMail(
         complaint.user.email,
-        "Your Complaint Has Been Resolved ✔️",
+        "Your Complaint Is Pending Verification",
         `
     <div style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; color: #333;">
-      <h2 style="color: #2b6cb0;">Your Complaint Has Been Resolved</h2>
+      <h2 style="color: #2b6cb0;">Your Complaint Is Pending Verification</h2>
 
       <p>Hi ${complaint.user.fullName},</p>
 
       <p>
-        We are happy to inform you that your complaint has been successfully resolved.
+        An administrator has reported your issue fixed. Community verification is still required before final resolution.
       </p>
 
       <div style="background: #f3f4f6; padding: 15px; border-left: 4px solid #2b6cb0; margin: 20px 0;">
@@ -963,7 +978,7 @@ export const updateComplaint = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Complaint updated successfully",
-      complaint,
+      complaint: await Complaint.findById(complaintId).populate("user", PUBLIC_USER_FIELDS),
     });
   } catch (error) {
     return res.status(500).json({
@@ -981,7 +996,7 @@ export const getComplaint = async (req, res) => {
     const complaint = await Complaint.findOne({
       _id: complaintId,
       ...ACTIVE_COMPLAINT_QUERY,
-    }).populate("user");
+    }).populate("user", PUBLIC_USER_FIELDS);
 
     if (!complaint) {
       return res
@@ -1030,7 +1045,7 @@ export const rateComplaint = async (req, res) => {
       });
     }
 
-    if (complaint.status !== "resolved") {
+    if (!["resolved", "confirmed_resolved"].includes(complaint.status)) {
       return res.status(400).json({
         success: false,
         message: "You can only rate resolved complaints",
@@ -1039,7 +1054,7 @@ export const rateComplaint = async (req, res) => {
 
     complaint.rating = rating;
     await complaint.save();
-    const populatedComplaint = await Complaint.findById(complaint._id).populate("user");
+    const populatedComplaint = await Complaint.findById(complaint._id).populate("user", PUBLIC_USER_FIELDS);
 
     res.status(200).json({
       success: true,
@@ -1066,7 +1081,7 @@ export const getComplaintStats = async (req, res) => {
       });
     }
 
-    const complaints = await Complaint.find(ACTIVE_COMPLAINT_QUERY);
+    const complaints = await Complaint.find(ACTIVE_COMPLAINT_QUERY).populate("user", PUBLIC_USER_FIELDS);
 
     const newComplaint = complaints.filter((c) => c.status === "new");
     const inProgressComplaint = complaints.filter(
@@ -1141,7 +1156,7 @@ export const getPaginatedComplaints = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("user");
+      .populate("user", PUBLIC_USER_FIELDS);
 
     res.status(200).json({
       success: true,
@@ -1210,7 +1225,7 @@ export const getMyPaginatedComplaints = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("user", "fullName email profilePic isAdmin homeDistrict civicPoints rank");
+      .populate("user", PUBLIC_USER_FIELDS);
 
     res.status(200).json({
       success: true,
@@ -1260,7 +1275,7 @@ export const getComplaintsWithMessages = async (req, res) => {
       .sort({ updatedAt: -1 }) // Sort by recently updated
       .skip(skip)
       .limit(limit)
-      .populate("user");
+      .populate("user", PUBLIC_USER_FIELDS);
 
     res.status(200).json({
       success: true,
@@ -1310,7 +1325,7 @@ export const getMyComplaintsWithMessages = async (req, res) => {
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("user", "fullName email profilePic isAdmin homeDistrict civicPoints rank");
+      .populate("user", PUBLIC_USER_FIELDS);
 
     res.status(200).json({
       success: true,
@@ -1826,7 +1841,7 @@ export const verifyComplaint = async (req, res) => {
     res.status(200).json({
       success: true,
       message: complaint.status === "resolved" ? "Complaint fully resolved!" : "Verification recorded",
-      complaint: await Complaint.findById(id).populate("user")
+      complaint: await Complaint.findById(id).populate("user", PUBLIC_USER_FIELDS)
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -1929,7 +1944,7 @@ export const disputeComplaint = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Dispute submitted successfully",
-      complaint: await Complaint.findById(id).populate("user")
+      complaint: await Complaint.findById(id).populate("user", PUBLIC_USER_FIELDS)
     });
   } catch (error) {
     console.error("[Dispute] CRITICAL ERROR:", error);
@@ -1998,7 +2013,7 @@ export const resolveDispute = async (req, res) => {
     res.status(200).json({
       success: true,
       message: `Dispute ${action === "reopen" ? "re-opened" : "confirmed resolved"}`,
-      complaint: await Complaint.findById(id).populate("user")
+      complaint: await Complaint.findById(id).populate("user", PUBLIC_USER_FIELDS)
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
